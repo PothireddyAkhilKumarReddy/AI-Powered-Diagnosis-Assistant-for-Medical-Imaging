@@ -39,6 +39,13 @@ if TF_AVAILABLE:
             if "dtype" in kwargs:
                 kwargs.pop("dtype")
             super().__init__(*args, **kwargs)
+
+    class FixedNormalization(tf.keras.layers.Normalization):
+        def __init__(self, *args, **kwargs):
+            # Keras 3 saves 'dtype' as a policy dict/obj, Keras 2 expects string.
+            if "dtype" in kwargs:
+                kwargs.pop("dtype")
+            super().__init__(*args, **kwargs)
 try:
     import numpy as np
     NP_AVAILABLE = True
@@ -74,7 +81,8 @@ try:
         # Use custom_objects to replace InputLayer and Rescaling with our fixed versions
         model = load_model(MODEL_PATH, custom_objects={
             "InputLayer": FixedInputLayer,
-            "Rescaling": FixedRescaling
+            "Rescaling": FixedRescaling,
+            "Normalization": FixedNormalization
         })
         print("Model loaded successfully!")
     else:
