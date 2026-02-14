@@ -1,0 +1,7 @@
+flask
+flask-cors
+# numpy  <-- Commented out to use Colab's default
+# matplotlib <-- Commented out to use Colab's default
+# seaborn <-- Commented out to use Colab's default
+# scikit-learn <-- Commented out to use Colab's default
+# Pillow <-- Commented out to use Colab's default

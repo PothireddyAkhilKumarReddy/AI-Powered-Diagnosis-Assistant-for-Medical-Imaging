@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Model Files
+# We WANT to track model.h5 (24MB is fine)
+# *.h5
+*.keras
+*.pkl
+best_model.h5  # Just in case
+
+# Datasets (Too large for git)
+dataset/
+tiny_dataset/
+small_dataset/
+COVID-19_Radiography_Dataset/
+chest_xray/
+
+# Uploads (User data)
+uploads/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

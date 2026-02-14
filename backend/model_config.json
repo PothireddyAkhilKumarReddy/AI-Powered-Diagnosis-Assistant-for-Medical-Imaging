@@ -1,0 +1,19 @@
+{
+  "classes": [
+    "COVID-19",
+    "Normal",
+    "Pneumonia"
+  ],
+  "input_shape": [
+    224,
+    224,
+    3
+  ],
+  "model_type": "resnet50",
+  "training_history": {
+    "final_accuracy": 0.44999998807907104,
+    "final_val_accuracy": 0.4833333194255829,
+    "final_loss": 1.5298285484313965,
+    "final_val_loss": 1.2921282052993774
+  }
+}
