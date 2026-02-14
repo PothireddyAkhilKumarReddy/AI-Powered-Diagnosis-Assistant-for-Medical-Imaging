@@ -1,6 +1,10 @@
 # app.py
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+import os
+
+# WORKAROUND: Force TensorFlow to use legacy Keras (fixes 'Layer dense expects 1 input' error on Render)
+os.environ["TF_USE_LEGACY_KERAS"] = "1"
 
 # WORKAROUND: Fix for TensorFlow < 2.10 on Windows with newer NumPy
 try:
