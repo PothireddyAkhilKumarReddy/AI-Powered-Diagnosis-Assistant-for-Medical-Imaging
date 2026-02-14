@@ -20,12 +20,17 @@ try:
 except ImportError as e:
     TF_AVAILABLE = False
     print(f"TensorFlow not found. Error: {e}")
-except ImportError as e:
-    TF_AVAILABLE = False
-    print(f"TensorFlow not found. Error: {e}")
 except Exception as e:
     TF_AVAILABLE = False
     print(f"Unexpected error importing TensorFlow: {e}")
+
+# WORKAROUND: Fix 'batch_shape' error when loading Keras 3 model in Keras 2
+if TF_AVAILABLE:
+    class FixedInputLayer(tf.keras.layers.InputLayer):
+        def __init__(self, *args, **kwargs):
+            if "batch_shape" in kwargs:
+                kwargs.pop("batch_shape")
+            super().__init__(*args, **kwargs)
 try:
     import numpy as np
     NP_AVAILABLE = True
@@ -58,7 +63,8 @@ def serve_static(path):
 model = None
 try:
     if TF_AVAILABLE:
-        model = load_model(MODEL_PATH)
+        # Use custom_objects to replace InputLayer with our fixed version
+        model = load_model(MODEL_PATH, custom_objects={"InputLayer": FixedInputLayer})
         print("Model loaded successfully!")
     else:
         print("Skipping model load because TensorFlow is not available.")
