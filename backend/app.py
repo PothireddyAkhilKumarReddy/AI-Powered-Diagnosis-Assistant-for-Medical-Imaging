@@ -17,9 +17,12 @@ try:
     from tensorflow.keras.models import load_model
     from tensorflow.keras.preprocessing import image
     TF_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     TF_AVAILABLE = False
-    print("TensorFlow not found. Using mock predictions.")
+    print(f"TensorFlow not found. Error: {e}")
+except Exception as e:
+    TF_AVAILABLE = False
+    print(f"Unexpected error importing TensorFlow: {e}")
 try:
     import numpy as np
     NP_AVAILABLE = True
@@ -51,8 +54,11 @@ def serve_static(path):
 # Load pre-trained model or use mock model
 model = None
 try:
-    model = load_model(MODEL_PATH)
-    print("Model loaded successfully!")
+    if TF_AVAILABLE:
+        model = load_model(MODEL_PATH)
+        print("Model loaded successfully!")
+    else:
+        print("Skipping model load because TensorFlow is not available.")
 except FileNotFoundError:
     print(f"Model file '{MODEL_PATH}' not found. Using mock predictions for demonstration.")
 except Exception as e:
