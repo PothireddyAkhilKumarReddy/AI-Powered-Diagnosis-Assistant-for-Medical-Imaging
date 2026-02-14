@@ -17,7 +17,6 @@ try:
     image = tf.keras.preprocessing.image
     TF_AVAILABLE = True
     print(f"TensorFlow version: {tf.__version__}")
-    print(f"Keras version: {keras.__version__}")
 except ImportError as e:
     TF_AVAILABLE = False
     print(f"TensorFlow not found. Error: {e}")
