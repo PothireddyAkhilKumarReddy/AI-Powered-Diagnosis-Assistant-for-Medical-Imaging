@@ -24,12 +24,20 @@ except Exception as e:
     TF_AVAILABLE = False
     print(f"Unexpected error importing TensorFlow: {e}")
 
-# WORKAROUND: Fix 'batch_shape' error when loading Keras 3 model in Keras 2
+# WORKAROUND: Fix 'batch_shape' and 'DTypePolicy' errors when loading Keras 3 model in Keras 2
 if TF_AVAILABLE:
     class FixedInputLayer(tf.keras.layers.InputLayer):
         def __init__(self, *args, **kwargs):
             if "batch_shape" in kwargs:
                 kwargs.pop("batch_shape")
+            super().__init__(*args, **kwargs)
+
+    class FixedRescaling(tf.keras.layers.Rescaling):
+        def __init__(self, *args, **kwargs):
+            # Keras 3 saves 'dtype' as a policy dict/obj, Keras 2 expects string.
+            # We just remove it to fallback to default (float32).
+            if "dtype" in kwargs:
+                kwargs.pop("dtype")
             super().__init__(*args, **kwargs)
 try:
     import numpy as np
@@ -63,8 +71,11 @@ def serve_static(path):
 model = None
 try:
     if TF_AVAILABLE:
-        # Use custom_objects to replace InputLayer with our fixed version
-        model = load_model(MODEL_PATH, custom_objects={"InputLayer": FixedInputLayer})
+        # Use custom_objects to replace InputLayer and Rescaling with our fixed versions
+        model = load_model(MODEL_PATH, custom_objects={
+            "InputLayer": FixedInputLayer,
+            "Rescaling": FixedRescaling
+        })
         print("Model loaded successfully!")
     else:
         print("Skipping model load because TensorFlow is not available.")
