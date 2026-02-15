@@ -30,8 +30,14 @@ if TF_AVAILABLE:
     def fix_layer(LayerClass):
         class FixedLayer(LayerClass):
             def __init__(self, *args, **kwargs):
-                if "dtype" in kwargs: kwargs.pop("dtype")
-                if "batch_shape" in kwargs: kwargs.pop("batch_shape")
+                if "dtype" in kwargs: 
+                    kwargs.pop("dtype")
+                if "batch_shape" in kwargs: 
+                    # Keras 3 uses 'batch_shape', Keras 2 uses 'batch_input_shape'
+                    # We rename it so Keras 2 can recognize the input shape
+                    batch_shape = kwargs.pop("batch_shape")
+                    if "batch_input_shape" not in kwargs:
+                        kwargs["batch_input_shape"] = batch_shape
                 super().__init__(*args, **kwargs)
         return FixedLayer
 
