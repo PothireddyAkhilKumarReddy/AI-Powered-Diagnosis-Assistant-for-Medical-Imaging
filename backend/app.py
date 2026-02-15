@@ -58,54 +58,72 @@ if TF_AVAILABLE:
             import sys
             import types
             
+            # Define the patched function
             def patched_process_node(layer, node_data):
-                # Debug logging to catch the exact malformed data
-                # print(f"DEBUG: Processing layer {layer.name}, node_data type: {type(node_data)}")
-                
                 # Check 1: If it's a bare string, wrap it.
                 if isinstance(node_data, str):
-                    # print(f"DEBUG: Wrapping raw string node_data: {node_data}")
                     node_data = [[node_data, 0, 0, {}]]
                 
                 # Check 2: If it's a flat list starting with a string (e.g. ['layer', 0, 0])
                 # instead of a list of lists (e.g. [['layer', 0, 0]]), wrap it.
                 elif isinstance(node_data, list) and len(node_data) > 0 and isinstance(node_data[0], str):
-                    # print(f"DEBUG: Wrapping flat list node_data: {node_data}")
                     node_data = [node_data]
                     
-                # Call the original (we need to find it dynamically or store it)
-                # Since we are patching multiple modules, we can't easily capture the "original" once.
-                # We will rely on the fact that we patched it on the module.
-                # BUT this is risky if we create infinite recursion.
-                # Strategy: We need to capture the original function per module.
-                
-                # FALLBACK: If we can't find original, fail? 
-                # Actually, let's just define the logic here if possible, OR capture the original
-                # before defining this.
-                
-                # Better strategy: Capture original from one valid source, assuming they are the same function logic.
-                return _original_process_node_ref(layer, node_data)
+                # Execute original function (captured via closure/globals or finding it on the fly)
+                # We need to call the Original implementation.
+                # Since we patch the module, we can't easily call "super". 
+                # We should have saved the original reference.
+                return _original_process_node(layer, node_data)
 
-            # Find the original function to keep a reference
-            _original_process_node_ref = None
+            # References to modules we want to patch
+            targets = [
+                "keras.src.engine.functional",
+                "keras.engine.functional",
+                "tensorflow.python.keras.engine.functional",
+                "tensorflow.keras.engine.functional"
+            ]
             
-            # 1. Identify all modules that need patching
-            modules_to_patch = []
-            for name, module in sys.modules.items():
-                if "keras" in name and "functional" in name and hasattr(module, "process_node"):
-                    modules_to_patch.append(module)
+            _original_process_node = None
+            modules_patched = 0
             
-            # 2. Capture original function (assuming all modules point to same impl or compatible)
-            if modules_to_patch:
-                _original_process_node_ref = modules_to_patch[0].process_node
-                
-            # 3. Apply patch
-            if _original_process_node_ref:
-                for module in modules_to_patch:
-                    # print(f"DEBUG: Patching process_node in {module.__name__}")
-                    module.process_node = patched_process_node
-            else:
-                print("WARNING: Could not find any functional module to patch!")
+            import importlib
+            
+            for module_name in targets:
+                try:
+                    # Try importing the module
+                    if module_name in sys.modules:
+                        mod = sys.modules[module_name]
+                    else:
+                        mod = importlib.import_module(module_name)
+                    
+                    if hasattr(mod, "process_node"):
+                        # Capture original if we haven't yet
+                        if _original_process_node is None:
+                            _original_process_node = mod.process_node
+                        
+                        # Apply patch
+                        mod.process_node = patched_process_node
+                        print(f"DEBUG: Patched {module_name}")
+                        modules_patched += 1
+                except ImportError:
+                    continue
+                except Exception as e:
+                    print(f"DEBUG: Error patching {module_name}: {e}")
+
+            # Fallback check
+            if modules_patched == 0:
+                print("WARNING: Could not find any functional module to patch! Checking sys.modules...")
+                # Last ditch effort: search sys.modules
+                for name, mod in sys.modules.items():
+                    if "functional" in name and hasattr(mod, "process_node"):
+                        if _original_process_node is None:
+                             _original_process_node = mod.process_node
+                        mod.process_node = patched_process_node
+                        print(f"DEBUG: Patched found module {name}")
+                        modules_patched += 1
+            
+            if modules_patched == 0:
+                print("ERROR: FAILED TO MATCH ANY MODULE FOR MONKEY PATCHING.")
                 
         except Exception as e:
             print(f"FAILED TO MONKEY PATCH: {e}")
