@@ -118,6 +118,7 @@ def serve_static(path):
 model = None
 try:
     if TF_AVAILABLE:
+        import traceback
         # Use custom_objects to replace layers with our fixed versions
         model = load_model(MODEL_PATH, custom_objects=custom_objects)
         print("Model loaded successfully!")
@@ -126,7 +127,10 @@ try:
 except FileNotFoundError:
     print(f"Model file '{MODEL_PATH}' not found. Using mock predictions for demonstration.")
 except Exception as e:
+    import traceback
     print(f"Error loading model: {e}. Using mock predictions for demonstration.")
+    print("Full traceback:")
+    traceback.print_exc()
 
 # Define class labels - must match the order used during training
 labels = ["COVID-19", "Normal", "Pneumonia"]  # Match the training order
