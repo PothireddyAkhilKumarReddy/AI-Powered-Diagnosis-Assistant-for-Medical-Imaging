@@ -5,7 +5,7 @@
   "main": "index.html",
   "scripts": {
     "start": "python -m http.server 3000",
-    "build": "echo 'Static HTML build complete'"
+    "build": "mkdir -p public && cp index.html styles.css public/"
   },
   "keywords": ["medical", "ai", "diagnostic", "frontend"],
   "author": "Your Name",
