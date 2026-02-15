@@ -52,7 +52,11 @@ if TF_AVAILABLE:
     FixedAdd = fix_layer(tf.keras.layers.Add)
     FixedReLU = fix_layer(tf.keras.layers.ReLU)
     FixedActivation = fix_layer(tf.keras.layers.Activation)
+    FixedActivation = fix_layer(tf.keras.layers.Activation)
     FixedConcatenate = fix_layer(tf.keras.layers.Concatenate)
+    FixedReshape = fix_layer(tf.keras.layers.Reshape)
+    FixedMultiply = fix_layer(tf.keras.layers.Multiply)
+    FixedPermute = fix_layer(tf.keras.layers.Permute)
 
     custom_objects = {
         "InputLayer": FixedInputLayer,
@@ -71,7 +75,10 @@ if TF_AVAILABLE:
         "Add": FixedAdd,
         "ReLU": FixedReLU,
         "Activation": FixedActivation,
-        "Concatenate": FixedConcatenate
+        "Concatenate": FixedConcatenate,
+        "Reshape": FixedReshape,
+        "Multiply": FixedMultiply,
+        "Permute": FixedPermute
     }
 try:
     import numpy as np
