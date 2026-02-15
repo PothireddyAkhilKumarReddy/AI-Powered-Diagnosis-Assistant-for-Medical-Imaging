@@ -56,74 +56,61 @@ if TF_AVAILABLE:
         # Keras 3 saves inbound nodes differently than Keras 2 expects.
         try:
             import sys
-            import types
-            
-            # Define the patched function
-            def patched_process_node(layer, node_data):
-                # Check 1: If it's a bare string, wrap it.
-                if isinstance(node_data, str):
-                    node_data = [[node_data, 0, 0, {}]]
-                
-                # Check 2: If it's a flat list starting with a string (e.g. ['layer', 0, 0])
-                # instead of a list of lists (e.g. [['layer', 0, 0]]), wrap it.
-                elif isinstance(node_data, list) and len(node_data) > 0 and isinstance(node_data[0], str):
-                    node_data = [node_data]
-                    
-                # Execute original function (captured via closure/globals or finding it on the fly)
-                # We need to call the Original implementation.
-                # Since we patch the module, we can't easily call "super". 
-                # We should have saved the original reference.
-                return _original_process_node(layer, node_data)
-
-            # References to modules we want to patch
-            targets = [
-                "keras.src.engine.functional",
-                "keras.engine.functional",
-                "tensorflow.python.keras.engine.functional",
-                "tensorflow.keras.engine.functional"
-            ]
-            
-            _original_process_node = None
-            modules_patched = 0
-            
             import importlib
             
-            for module_name in targets:
+            # Helper to find and patch the module
+            def patch_functional_module():
+                print("DEBUG: Attempting to find and patch functional module...")
+                
+                # 1. Force import commonly used paths to ensure they are in sys.modules
                 try:
-                    # Try importing the module
-                    if module_name in sys.modules:
-                        mod = sys.modules[module_name]
-                    else:
-                        mod = importlib.import_module(module_name)
-                    
-                    if hasattr(mod, "process_node"):
-                        # Capture original if we haven't yet
-                        if _original_process_node is None:
-                            _original_process_node = mod.process_node
-                        
-                        # Apply patch
-                        mod.process_node = patched_process_node
-                        print(f"DEBUG: Patched {module_name}")
-                        modules_patched += 1
+                    from keras.engine import functional
                 except ImportError:
-                    continue
-                except Exception as e:
-                    print(f"DEBUG: Error patching {module_name}: {e}")
+                    pass
+                try:
+                    from tensorflow.python.keras.engine import functional
+                except ImportError:
+                    pass
+                
+                # 2. Define the patch
+                def patched_process_node(layer, node_data):
+                    # Check 1: If it's a bare string, wrap it.
+                    if isinstance(node_data, str):
+                         node_data = [[node_data, 0, 0, {}]]
+                    
+                    # Check 2: If it's a flat list starting with a string
+                    elif isinstance(node_data, list) and len(node_data) > 0 and isinstance(node_data[0], str):
+                         node_data = [node_data]
+                        
+                    return _original_process_node(layer, node_data)
 
-            # Fallback check
-            if modules_patched == 0:
-                print("WARNING: Could not find any functional module to patch! Checking sys.modules...")
-                # Last ditch effort: search sys.modules
-                for name, mod in sys.modules.items():
-                    if "functional" in name and hasattr(mod, "process_node"):
-                        if _original_process_node is None:
-                             _original_process_node = mod.process_node
-                        mod.process_node = patched_process_node
-                        print(f"DEBUG: Patched found module {name}")
-                        modules_patched += 1
-            
-            if modules_patched == 0:
-                print("ERROR: FAILED TO MATCH ANY MODULE FOR MONKEY PATCHING.")
+                # 3. Search sys.modules for any module that looks like the target
+                # The traceback says: .../keras/src/engine/functional.py
+                # This could be under key 'keras.src.engine.functional' or 'keras.engine.functional'
+                
+                targets = []
+                for name, module in list(sys.modules.items()):
+                    if "functional" in name and hasattr(module, "process_node"):
+                        targets.append(module)
+                        print(f"DEBUG: Found candidate module: {name}")
+                
+                if not targets:
+                    print("DEBUGGING SYS.MODULES (keras related):")
+                    for k in sorted(sys.modules.keys()):
+                        if "keras" in k and "func" in k:
+                            print(f"  {k}")
+                    print("ERROR: Could not find any module with process_node to patch.")
+                    return
+
+                # 4. Patch all found targets
+                global _original_process_node
+                _original_process_node = targets[0].process_node # Capture one original
+                
+                for module in targets:
+                    print(f"DEBUG: Applying patch to {module.__name__}")
+                    module.process_node = patched_process_node
+
+            patch_functional_module()
                 
         except Exception as e:
             print(f"FAILED TO MONKEY PATCH: {e}")
