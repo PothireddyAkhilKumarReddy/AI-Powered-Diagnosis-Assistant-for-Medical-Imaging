@@ -51,6 +51,8 @@ if TF_AVAILABLE:
     FixedFlatten = fix_layer(tf.keras.layers.Flatten)
     FixedAdd = fix_layer(tf.keras.layers.Add)
     FixedReLU = fix_layer(tf.keras.layers.ReLU)
+    FixedActivation = fix_layer(tf.keras.layers.Activation)
+    FixedConcatenate = fix_layer(tf.keras.layers.Concatenate)
 
     custom_objects = {
         "InputLayer": FixedInputLayer,
@@ -67,7 +69,9 @@ if TF_AVAILABLE:
         "AveragePooling2D": FixedAveragePooling2D,
         "Flatten": FixedFlatten,
         "Add": FixedAdd,
-        "ReLU": FixedReLU
+        "ReLU": FixedReLU,
+        "Activation": FixedActivation,
+        "Concatenate": FixedConcatenate
     }
 try:
     import numpy as np
