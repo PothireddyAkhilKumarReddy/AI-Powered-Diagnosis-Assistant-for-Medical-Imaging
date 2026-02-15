@@ -119,27 +119,20 @@ if TF_AVAILABLE:
         # Apply patch to the entire config tree
         patch_config(config)
         
-        # DEBUG: Print a snippet of the patched config (e.g. first layer with inbound nodes)
-        # to verify our work. 
-        print("DEBUG: Patching complete. Printing sample inbound_nodes from config...")
+        # DEBUG: Dump the config to logs so we can see the structure
+        print("DEBUG: DUMPING PATCHED CONFIG (Partial):")
         try:
+            # Print first layer's inbound nodes to see if we fixed it
             for layer in config.get('config', {}).get('layers', []):
                 if layer.get('inbound_nodes'):
                     print(f"Layer {layer.get('name')} inbound_nodes: {layer['inbound_nodes']}")
-                    break
-        except:
-            pass
-        
+        except Exception as e:
+            print(f"DEBUG: Could not dump config: {e}")
+
         # Reconstruct model from patched config
         print("DEBUG: Reconstructing model from config...")
-        try:
-            model = model_from_config(config)
-            print("DEBUG: Model reconstructed.")
-        except Exception as e:
-            print(f"DEBUG: Failed to reconstruct model: {e}")
-            # Print the config that failed
-            # print(json.dumps(config, indent=2))
-            raise e
+        model = model_from_config(config)
+        print("DEBUG: Model reconstructed.")
         
         # Load weights
         print("DEBUG: Loading weights...")
@@ -147,17 +140,19 @@ if TF_AVAILABLE:
         print("DEBUG: Weights loaded.")
         
         return model
-
+    
     custom_objects = {} # No longer needed with this approach
+
 try:
     import numpy as np
     NP_AVAILABLE = True
 except ImportError:
     NP_AVAILABLE = False
     print("NumPy not found. Using pure Python mocks.")
+    
 import os
 import random
-
+import pprint
 
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)  # Enable CORS for frontend-backend communication
@@ -176,23 +171,28 @@ def index():
 def serve_static(path):
     return send_from_directory('../frontend', path)
 
+# Health check endpoint
+@app.route('/health')
+def health():
+    return jsonify({"status": "healthy", "tf_available": TF_AVAILABLE, "model_loaded": model is not None})
 
 # Load pre-trained model or use mock model
 model = None
 try:
     if TF_AVAILABLE:
-        # Use separate config patching method for maximum compatibility
+        print("DEBUG: Attempting to load model...")
         model = patch_model_config(MODEL_PATH)
         print("Model loaded successfully!")
     else:
         print("Skipping model load because TensorFlow is not available.")
 except FileNotFoundError:
-    print(f"Model file '{MODEL_PATH}' not found. Using mock predictions for demonstration.")
+    print(f"Model file '{MODEL_PATH}' not found. Using mock predictions.")
 except Exception as e:
     import traceback
-    print(f"Error loading model: {e}. Using mock predictions for demonstration.")
+    print(f"Error loading model: {e}. Defaulting to MOCK PREDICTIONS.")
     print("Full traceback:")
     traceback.print_exc()
+
 
 # Define class labels - must match the order used during training
 labels = ["COVID-19", "Normal", "Pneumonia"]  # Match the training order
@@ -237,14 +237,18 @@ def predict():
     """
     Endpoint to receive an image and return AI-generated diagnosis in a conversational format.
     """
+    print("DEBUG: /predict endpoint called")
     if "image" not in request.files:
+        print("DEBUG: No image in request files")
         return jsonify({"success": False, "error": "Please upload a medical image (X-ray, MRI, CT scan) to get a diagnosis."}), 400
     
     file = request.files["image"]
+    print(f"DEBUG: Received file: {file.filename}")
     img_path = os.path.join("uploads", file.filename)
     file.save(img_path)
 
     try:
+        print(f"DEBUG: Processing image. Model loaded? {model is not None}")
         if TF_AVAILABLE and NP_AVAILABLE and model is not None:
             # Use real model prediction
             processed_img = preprocess_image(img_path)
