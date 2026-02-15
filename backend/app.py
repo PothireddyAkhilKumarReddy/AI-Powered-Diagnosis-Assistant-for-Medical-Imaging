@@ -52,71 +52,6 @@ if TF_AVAILABLE:
         import h5py
         from tensorflow.keras.models import model_from_config
         
-        # MONKEY PATCH: Fix for 'str' object has no attribute 'as_list' in Functional API
-        # Keras 3 saves inbound nodes differently than Keras 2 expects.
-        try:
-            import sys
-            import importlib
-            
-            # Helper to find and patch the module
-            def patch_functional_module():
-                print("DEBUG: Attempting to find and patch functional module...")
-                
-                # 1. Force import commonly used paths to ensure they are in sys.modules
-                try:
-                    from keras.engine import functional
-                except ImportError:
-                    pass
-                try:
-                    from tensorflow.python.keras.engine import functional
-                except ImportError:
-                    pass
-                
-                # 2. Define the patch
-                def patched_process_node(layer, node_data):
-                    # Check 1: If it's a bare string, wrap it.
-                    if isinstance(node_data, str):
-                         node_data = [[node_data, 0, 0, {}]]
-                    
-                    # Check 2: If it's a flat list starting with a string
-                    elif isinstance(node_data, list) and len(node_data) > 0 and isinstance(node_data[0], str):
-                         node_data = [node_data]
-                        
-                    return _original_process_node(layer, node_data)
-
-                # 3. Search sys.modules for any module that looks like the target
-                # The traceback says: .../keras/src/engine/functional.py
-                # This could be under key 'keras.src.engine.functional' or 'keras.engine.functional'
-                
-                targets = []
-                for name, module in list(sys.modules.items()):
-                    if "functional" in name and hasattr(module, "process_node"):
-                        targets.append(module)
-                        print(f"DEBUG: Found candidate module: {name}")
-                
-                if not targets:
-                    print("DEBUGGING SYS.MODULES (keras related):")
-                    for k in sorted(sys.modules.keys()):
-                        if "keras" in k and "func" in k:
-                            print(f"  {k}")
-                    print("ERROR: Could not find any module with process_node to patch.")
-                    return
-
-                # 4. Patch all found targets
-                global _original_process_node
-                _original_process_node = targets[0].process_node # Capture one original
-                
-                for module in targets:
-                    print(f"DEBUG: Applying patch to {module.__name__}")
-                    module.process_node = patched_process_node
-
-            patch_functional_module()
-                
-        except Exception as e:
-            print(f"FAILED TO MONKEY PATCH: {e}")
-            import traceback
-            traceback.print_exc()
-
         with h5py.File(model_path, 'r') as f:
             if 'model_config' not in f.attrs:
                 raise ValueError("No model_config found in h5 file")
@@ -136,6 +71,25 @@ if TF_AVAILABLE:
                 # Remove dtype policies
                 if "dtype" in item and isinstance(item["dtype"], dict):
                     item.pop("dtype")
+                    
+                # FIX: Keras 3 inbound_nodes (flat lists) vs Keras 2 (list of lists)
+                if "inbound_nodes" in item:
+                    inbound_nodes = item["inbound_nodes"]
+                    # Check if it's the new format and needs wrapping
+                    if isinstance(inbound_nodes, list):
+                        new_nodes = []
+                        for node in inbound_nodes:
+                            # Case 1: Node is a bare string (unexpected but possible in some formats)
+                            if isinstance(node, str):
+                                new_nodes.append([node, 0, 0, {}])
+                            # Case 2: Node is a flat list ['layer_name', 0, ...] - Keras 3 style
+                            elif isinstance(node, list) and len(node) > 0 and isinstance(node[0], str):
+                                new_nodes.append([node])
+                            # Case 3: Already correct [[...]] (Keras 2 style) or empty
+                            else:
+                                new_nodes.append(node)
+                        item["inbound_nodes"] = new_nodes
+
                 # Recursive call for all values
                 for key, value in item.items():
                     patch_config(value)
