@@ -59,10 +59,15 @@ if TF_AVAILABLE:
             original_process_node = functional.process_node
 
             def patched_process_node(layer, node_data):
-                # If node_data is just a string (layer name), wrap it in the expected list format
-                # Keras 2 expects: [layer_name, node_index, tensor_index, kwargs]
+                # Check 1: If it's a bare string, wrap it.
                 if isinstance(node_data, str):
                     node_data = [[node_data, 0, 0, {}]]
+                
+                # Check 2: If it's a flat list starting with a string (e.g. ['layer', 0, 0])
+                # instead of a list of lists (e.g. [['layer', 0, 0]]), wrap it.
+                elif isinstance(node_data, list) and len(node_data) > 0 and isinstance(node_data[0], str):
+                    node_data = [node_data]
+                
                 return original_process_node(layer, node_data)
 
             # Apply monkey patch
