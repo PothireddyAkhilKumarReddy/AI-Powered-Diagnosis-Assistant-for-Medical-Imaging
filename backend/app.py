@@ -12,7 +12,21 @@ except ImportError:
 
 try:
     import tensorflow as tf
-    from tensorflow import keras
+    try:
+        from tensorflow import keras
+    except ImportError:
+        import keras
+    
+    # Try exposing functional for monkey patching later
+    try:
+        from keras.engine import functional
+    except ImportError:
+        try:
+            from tensorflow.python.keras.engine import functional
+        except ImportError:
+             # Just in case, try through tf.keras
+            pass
+            
     load_model = tf.keras.models.load_model
     image = tf.keras.preprocessing.image
     TF_AVAILABLE = True
@@ -38,6 +52,24 @@ if TF_AVAILABLE:
         import h5py
         from tensorflow.keras.models import model_from_config
         
+        # MONKEY PATCH: Fix for 'str' object has no attribute 'as_list' in Functional API
+        # Keras 3 saves inbound nodes differently than Keras 2 expects.
+        try:
+            from tensorflow.keras.engine import functional
+            original_process_node = functional.process_node
+
+            def patched_process_node(layer, node_data):
+                # If node_data is just a string (layer name), wrap it in the expected list format
+                # Keras 2 expects: [layer_name, node_index, tensor_index, kwargs]
+                if isinstance(node_data, str):
+                    node_data = [[node_data, 0, 0, {}]]
+                return original_process_node(layer, node_data)
+
+            # Apply monkey patch
+            functional.process_node = patched_process_node
+        except ImportError:
+            pass # functional module might be elsewhere in different TF versions
+
         with h5py.File(model_path, 'r') as f:
             if 'model_config' not in f.attrs:
                 raise ValueError("No model_config found in h5 file")
