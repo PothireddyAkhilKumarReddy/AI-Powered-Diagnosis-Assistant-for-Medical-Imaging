@@ -26,26 +26,49 @@ except Exception as e:
 
 # WORKAROUND: Fix 'batch_shape' and 'DTypePolicy' errors when loading Keras 3 model in Keras 2
 if TF_AVAILABLE:
-    class FixedInputLayer(tf.keras.layers.InputLayer):
-        def __init__(self, *args, **kwargs):
-            if "batch_shape" in kwargs:
-                kwargs.pop("batch_shape")
-            super().__init__(*args, **kwargs)
+    # Helper to create fixed layers that ignore 'dtype' and 'batch_shape'
+    def fix_layer(LayerClass):
+        class FixedLayer(LayerClass):
+            def __init__(self, *args, **kwargs):
+                if "dtype" in kwargs: kwargs.pop("dtype")
+                if "batch_shape" in kwargs: kwargs.pop("batch_shape")
+                super().__init__(*args, **kwargs)
+        return FixedLayer
 
-    class FixedRescaling(tf.keras.layers.Rescaling):
-        def __init__(self, *args, **kwargs):
-            # Keras 3 saves 'dtype' as a policy dict/obj, Keras 2 expects string.
-            # We just remove it to fallback to default (float32).
-            if "dtype" in kwargs:
-                kwargs.pop("dtype")
-            super().__init__(*args, **kwargs)
+    # Generate fixed versions of common layers
+    FixedInputLayer = fix_layer(tf.keras.layers.InputLayer)
+    FixedRescaling = fix_layer(tf.keras.layers.Rescaling)
+    FixedNormalization = fix_layer(tf.keras.layers.Normalization)
+    FixedZeroPadding2D = fix_layer(tf.keras.layers.ZeroPadding2D)
+    FixedConv2D = fix_layer(tf.keras.layers.Conv2D)
+    FixedDepthwiseConv2D = fix_layer(tf.keras.layers.DepthwiseConv2D)
+    FixedBatchNormalization = fix_layer(tf.keras.layers.BatchNormalization)
+    FixedGlobalAveragePooling2D = fix_layer(tf.keras.layers.GlobalAveragePooling2D)
+    FixedDense = fix_layer(tf.keras.layers.Dense)
+    FixedDropout = fix_layer(tf.keras.layers.Dropout)
+    FixedMaxPooling2D = fix_layer(tf.keras.layers.MaxPooling2D)
+    FixedAveragePooling2D = fix_layer(tf.keras.layers.AveragePooling2D)
+    FixedFlatten = fix_layer(tf.keras.layers.Flatten)
+    FixedAdd = fix_layer(tf.keras.layers.Add)
+    FixedReLU = fix_layer(tf.keras.layers.ReLU)
 
-    class FixedNormalization(tf.keras.layers.Normalization):
-        def __init__(self, *args, **kwargs):
-            # Keras 3 saves 'dtype' as a policy dict/obj, Keras 2 expects string.
-            if "dtype" in kwargs:
-                kwargs.pop("dtype")
-            super().__init__(*args, **kwargs)
+    custom_objects = {
+        "InputLayer": FixedInputLayer,
+        "Rescaling": FixedRescaling,
+        "Normalization": FixedNormalization,
+        "ZeroPadding2D": FixedZeroPadding2D,
+        "Conv2D": FixedConv2D,
+        "DepthwiseConv2D": FixedDepthwiseConv2D,
+        "BatchNormalization": FixedBatchNormalization,
+        "GlobalAveragePooling2D": FixedGlobalAveragePooling2D,
+        "Dense": FixedDense,
+        "Dropout": FixedDropout,
+        "MaxPooling2D": FixedMaxPooling2D,
+        "AveragePooling2D": FixedAveragePooling2D,
+        "Flatten": FixedFlatten,
+        "Add": FixedAdd,
+        "ReLU": FixedReLU
+    }
 try:
     import numpy as np
     NP_AVAILABLE = True
@@ -78,12 +101,8 @@ def serve_static(path):
 model = None
 try:
     if TF_AVAILABLE:
-        # Use custom_objects to replace InputLayer and Rescaling with our fixed versions
-        model = load_model(MODEL_PATH, custom_objects={
-            "InputLayer": FixedInputLayer,
-            "Rescaling": FixedRescaling,
-            "Normalization": FixedNormalization
-        })
+        # Use custom_objects to replace layers with our fixed versions
+        model = load_model(MODEL_PATH, custom_objects=custom_objects)
         print("Model loaded successfully!")
     else:
         print("Skipping model load because TensorFlow is not available.")
