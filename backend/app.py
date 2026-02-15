@@ -44,103 +44,6 @@ if TF_AVAILABLE:
     # Instead of subclassing every layer, we load the model config, patch it, and reload.
     import json
     
-    def patch_model_config(model_path):
-        """
-        Manually reads the H5 file, extracts the definition, patches incompatible names,
-        and returns a model from the patched config.
-        """
-        import h5py
-        from tensorflow.keras.models import model_from_config
-        import pprint
-        
-        print("DEBUG: Starting patch_model_config...")
-        
-        with h5py.File(model_path, 'r') as f:
-            if 'model_config' not in f.attrs:
-                raise ValueError("No model_config found in h5 file")
-            config_str = f.attrs['model_config']
-            
-        print("DEBUG: Model config loaded from H5.")
-            
-        # Parse config JSON
-        if isinstance(config_str, bytes):
-            config_str = config_str.decode('utf-8')
-        config = json.loads(config_str)
-        
-        # Recursive patch function
-        def patch_config(item):
-            if isinstance(item, dict):
-                # Debug logging for layers
-                if "class_name" in item:
-                   # print(f"DEBUG: Patching layer {item['class_name']}")
-                   pass
-
-                # Fix batch_shape -> batch_input_shape
-                if "batch_shape" in item:
-                    item["batch_input_shape"] = item.pop("batch_shape")
-                # Remove dtype policies
-                if "dtype" in item and isinstance(item["dtype"], dict):
-                    item.pop("dtype")
-                    
-                # FIX: Keras 3 inbound_nodes (flat lists) vs Keras 2 (list of lists)
-                if "inbound_nodes" in item:
-                    inbound_nodes = item["inbound_nodes"]
-                    
-                    # LOGGING: Print what we found
-                    if inbound_nodes and isinstance(inbound_nodes, list) and len(inbound_nodes) > 0:
-                        # Only log if it looks suspicious (flat list) or just for the first non-empty one
-                        # print(f"DEBUG: Found inbound_nodes: {inbound_nodes}")
-                        pass
-
-                    # Check if it's the new format and needs wrapping
-                    if isinstance(inbound_nodes, list):
-                        new_nodes = []
-                        for node in inbound_nodes:
-                            # Case 1: Node is a bare string (unexpected but possible in some formats)
-                            if isinstance(node, str):
-                                print(f"DEBUG: Wrapping bare string node: {node}")
-                                new_nodes.append([node, 0, 0, {}])
-                            # Case 2: Node is a flat list ['layer_name', 0, ...] - Keras 3 style
-                            elif isinstance(node, list) and len(node) > 0 and isinstance(node[0], str):
-                                # print(f"DEBUG: Wrapping flat list node: {node}")
-                                new_nodes.append([node])
-                            # Case 3: Already correct [[...]] (Keras 2 style) or empty
-                            else:
-                                new_nodes.append(node)
-                        item["inbound_nodes"] = new_nodes
-
-                # Recursive call for all values
-                for key, value in item.items():
-                    patch_config(value)
-            elif isinstance(item, list):
-                for element in item:
-                    patch_config(element)
-                    
-        # Apply patch to the entire config tree
-        patch_config(config)
-        
-        # DEBUG: Dump the config to logs so we can see the structure
-        print("DEBUG: DUMPING PATCHED CONFIG (Partial):")
-        try:
-            # Print first layer's inbound nodes to see if we fixed it
-            for layer in config.get('config', {}).get('layers', []):
-                if layer.get('inbound_nodes'):
-                    print(f"Layer {layer.get('name')} inbound_nodes: {layer['inbound_nodes']}")
-        except Exception as e:
-            print(f"DEBUG: Could not dump config: {e}")
-
-        # Reconstruct model from patched config
-        print("DEBUG: Reconstructing model from config...")
-        model = model_from_config(config)
-        print("DEBUG: Model reconstructed.")
-        
-        # Load weights
-        print("DEBUG: Loading weights...")
-        model.load_weights(model_path)
-        print("DEBUG: Weights loaded.")
-        
-        return model
-    
     custom_objects = {} # No longer needed with this approach
 
 try:
@@ -180,8 +83,9 @@ def health():
 model = None
 try:
     if TF_AVAILABLE:
-        print("DEBUG: Attempting to load model...")
-        model = patch_model_config(MODEL_PATH)
+        print("DEBUG: Attempting to load model directly via tf.keras.models.load_model...")
+        # Use direct load as suggested by user/ChatGPT, disable compilation to avoid optimizer issues
+        model = tf.keras.models.load_model(MODEL_PATH, compile=False)
         print("Model loaded successfully!")
     else:
         print("Skipping model load because TensorFlow is not available.")
