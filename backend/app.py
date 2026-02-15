@@ -51,11 +51,16 @@ if TF_AVAILABLE:
         """
         import h5py
         from tensorflow.keras.models import model_from_config
+        import pprint
+        
+        print("DEBUG: Starting patch_model_config...")
         
         with h5py.File(model_path, 'r') as f:
             if 'model_config' not in f.attrs:
                 raise ValueError("No model_config found in h5 file")
             config_str = f.attrs['model_config']
+            
+        print("DEBUG: Model config loaded from H5.")
             
         # Parse config JSON
         if isinstance(config_str, bytes):
@@ -65,6 +70,11 @@ if TF_AVAILABLE:
         # Recursive patch function
         def patch_config(item):
             if isinstance(item, dict):
+                # Debug logging for layers
+                if "class_name" in item:
+                   # print(f"DEBUG: Patching layer {item['class_name']}")
+                   pass
+
                 # Fix batch_shape -> batch_input_shape
                 if "batch_shape" in item:
                     item["batch_input_shape"] = item.pop("batch_shape")
@@ -75,15 +85,24 @@ if TF_AVAILABLE:
                 # FIX: Keras 3 inbound_nodes (flat lists) vs Keras 2 (list of lists)
                 if "inbound_nodes" in item:
                     inbound_nodes = item["inbound_nodes"]
+                    
+                    # LOGGING: Print what we found
+                    if inbound_nodes and isinstance(inbound_nodes, list) and len(inbound_nodes) > 0:
+                        # Only log if it looks suspicious (flat list) or just for the first non-empty one
+                        # print(f"DEBUG: Found inbound_nodes: {inbound_nodes}")
+                        pass
+
                     # Check if it's the new format and needs wrapping
                     if isinstance(inbound_nodes, list):
                         new_nodes = []
                         for node in inbound_nodes:
                             # Case 1: Node is a bare string (unexpected but possible in some formats)
                             if isinstance(node, str):
+                                print(f"DEBUG: Wrapping bare string node: {node}")
                                 new_nodes.append([node, 0, 0, {}])
                             # Case 2: Node is a flat list ['layer_name', 0, ...] - Keras 3 style
                             elif isinstance(node, list) and len(node) > 0 and isinstance(node[0], str):
+                                # print(f"DEBUG: Wrapping flat list node: {node}")
                                 new_nodes.append([node])
                             # Case 3: Already correct [[...]] (Keras 2 style) or empty
                             else:
@@ -100,11 +119,32 @@ if TF_AVAILABLE:
         # Apply patch to the entire config tree
         patch_config(config)
         
+        # DEBUG: Print a snippet of the patched config (e.g. first layer with inbound nodes)
+        # to verify our work. 
+        print("DEBUG: Patching complete. Printing sample inbound_nodes from config...")
+        try:
+            for layer in config.get('config', {}).get('layers', []):
+                if layer.get('inbound_nodes'):
+                    print(f"Layer {layer.get('name')} inbound_nodes: {layer['inbound_nodes']}")
+                    break
+        except:
+            pass
+        
         # Reconstruct model from patched config
-        model = model_from_config(config)
+        print("DEBUG: Reconstructing model from config...")
+        try:
+            model = model_from_config(config)
+            print("DEBUG: Model reconstructed.")
+        except Exception as e:
+            print(f"DEBUG: Failed to reconstruct model: {e}")
+            # Print the config that failed
+            # print(json.dumps(config, indent=2))
+            raise e
         
         # Load weights
+        print("DEBUG: Loading weights...")
         model.load_weights(model_path)
+        print("DEBUG: Weights loaded.")
         
         return model
 
