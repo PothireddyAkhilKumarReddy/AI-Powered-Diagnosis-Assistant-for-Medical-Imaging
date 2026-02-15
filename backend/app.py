@@ -26,66 +26,56 @@ except Exception as e:
 
 # WORKAROUND: Fix 'batch_shape' and 'DTypePolicy' errors when loading Keras 3 model in Keras 2
 if TF_AVAILABLE:
-    # Helper to create fixed layers that ignore 'dtype' and 'batch_shape'
-    def fix_layer(LayerClass):
-        class FixedLayer(LayerClass):
-            def __init__(self, *args, **kwargs):
-                if "dtype" in kwargs: 
-                    kwargs.pop("dtype")
-                if "batch_shape" in kwargs: 
-                    # Keras 3 uses 'batch_shape', Keras 2 uses 'batch_input_shape'
-                    # We rename it so Keras 2 can recognize the input shape
-                    batch_shape = kwargs.pop("batch_shape")
-                    if "batch_input_shape" not in kwargs:
-                        kwargs["batch_input_shape"] = batch_shape
-                super().__init__(*args, **kwargs)
-        return FixedLayer
+    # WORKAROUND: Raw Model Configuration Patch
+    # Instead of subclassing every layer, we load the model config, patch it, and reload.
+    import json
+    
+    def patch_model_config(model_path):
+        """
+        Manually reads the H5 file, extracts the definition, patches incompatible names,
+        and returns a model from the patched config.
+        """
+        import h5py
+        from tensorflow.keras.models import model_from_config
+        
+        with h5py.File(model_path, 'r') as f:
+            if 'model_config' not in f.attrs:
+                raise ValueError("No model_config found in h5 file")
+            config_str = f.attrs['model_config']
+            
+        # Parse config JSON
+        if isinstance(config_str, bytes):
+            config_str = config_str.decode('utf-8')
+        config = json.loads(config_str)
+        
+        # Recursive patch function
+        def patch_config(item):
+            if isinstance(item, dict):
+                # Fix batch_shape -> batch_input_shape
+                if "batch_shape" in item:
+                    item["batch_input_shape"] = item.pop("batch_shape")
+                # Remove dtype policies
+                if "dtype" in item and isinstance(item["dtype"], dict):
+                    item.pop("dtype")
+                # Recursive call for all values
+                for key, value in item.items():
+                    patch_config(value)
+            elif isinstance(item, list):
+                for element in item:
+                    patch_config(element)
+                    
+        # Apply patch to the entire config tree
+        patch_config(config)
+        
+        # Reconstruct model from patched config
+        model = model_from_config(config)
+        
+        # Load weights
+        model.load_weights(model_path)
+        
+        return model
 
-    # Generate fixed versions of common layers
-    FixedInputLayer = fix_layer(tf.keras.layers.InputLayer)
-    FixedRescaling = fix_layer(tf.keras.layers.Rescaling)
-    FixedNormalization = fix_layer(tf.keras.layers.Normalization)
-    FixedZeroPadding2D = fix_layer(tf.keras.layers.ZeroPadding2D)
-    FixedConv2D = fix_layer(tf.keras.layers.Conv2D)
-    FixedDepthwiseConv2D = fix_layer(tf.keras.layers.DepthwiseConv2D)
-    FixedBatchNormalization = fix_layer(tf.keras.layers.BatchNormalization)
-    FixedGlobalAveragePooling2D = fix_layer(tf.keras.layers.GlobalAveragePooling2D)
-    FixedDense = fix_layer(tf.keras.layers.Dense)
-    FixedDropout = fix_layer(tf.keras.layers.Dropout)
-    FixedMaxPooling2D = fix_layer(tf.keras.layers.MaxPooling2D)
-    FixedAveragePooling2D = fix_layer(tf.keras.layers.AveragePooling2D)
-    FixedFlatten = fix_layer(tf.keras.layers.Flatten)
-    FixedAdd = fix_layer(tf.keras.layers.Add)
-    FixedReLU = fix_layer(tf.keras.layers.ReLU)
-    FixedActivation = fix_layer(tf.keras.layers.Activation)
-    FixedActivation = fix_layer(tf.keras.layers.Activation)
-    FixedConcatenate = fix_layer(tf.keras.layers.Concatenate)
-    FixedReshape = fix_layer(tf.keras.layers.Reshape)
-    FixedMultiply = fix_layer(tf.keras.layers.Multiply)
-    FixedPermute = fix_layer(tf.keras.layers.Permute)
-
-    custom_objects = {
-        "InputLayer": FixedInputLayer,
-        "Rescaling": FixedRescaling,
-        "Normalization": FixedNormalization,
-        "ZeroPadding2D": FixedZeroPadding2D,
-        "Conv2D": FixedConv2D,
-        "DepthwiseConv2D": FixedDepthwiseConv2D,
-        "BatchNormalization": FixedBatchNormalization,
-        "GlobalAveragePooling2D": FixedGlobalAveragePooling2D,
-        "Dense": FixedDense,
-        "Dropout": FixedDropout,
-        "MaxPooling2D": FixedMaxPooling2D,
-        "AveragePooling2D": FixedAveragePooling2D,
-        "Flatten": FixedFlatten,
-        "Add": FixedAdd,
-        "ReLU": FixedReLU,
-        "Activation": FixedActivation,
-        "Concatenate": FixedConcatenate,
-        "Reshape": FixedReshape,
-        "Multiply": FixedMultiply,
-        "Permute": FixedPermute
-    }
+    custom_objects = {} # No longer needed with this approach
 try:
     import numpy as np
     NP_AVAILABLE = True
@@ -118,9 +108,8 @@ def serve_static(path):
 model = None
 try:
     if TF_AVAILABLE:
-        import traceback
-        # Use custom_objects to replace layers with our fixed versions
-        model = load_model(MODEL_PATH, custom_objects=custom_objects)
+        # Use separate config patching method for maximum compatibility
+        model = patch_model_config(MODEL_PATH)
         print("Model loaded successfully!")
     else:
         print("Skipping model load because TensorFlow is not available.")
