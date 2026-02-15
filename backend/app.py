@@ -55,25 +55,62 @@ if TF_AVAILABLE:
         # MONKEY PATCH: Fix for 'str' object has no attribute 'as_list' in Functional API
         # Keras 3 saves inbound nodes differently than Keras 2 expects.
         try:
-            from tensorflow.keras.engine import functional
-            original_process_node = functional.process_node
-
+            import sys
+            import types
+            
             def patched_process_node(layer, node_data):
+                # Debug logging to catch the exact malformed data
+                # print(f"DEBUG: Processing layer {layer.name}, node_data type: {type(node_data)}")
+                
                 # Check 1: If it's a bare string, wrap it.
                 if isinstance(node_data, str):
+                    # print(f"DEBUG: Wrapping raw string node_data: {node_data}")
                     node_data = [[node_data, 0, 0, {}]]
                 
                 # Check 2: If it's a flat list starting with a string (e.g. ['layer', 0, 0])
                 # instead of a list of lists (e.g. [['layer', 0, 0]]), wrap it.
                 elif isinstance(node_data, list) and len(node_data) > 0 and isinstance(node_data[0], str):
+                    # print(f"DEBUG: Wrapping flat list node_data: {node_data}")
                     node_data = [node_data]
+                    
+                # Call the original (we need to find it dynamically or store it)
+                # Since we are patching multiple modules, we can't easily capture the "original" once.
+                # We will rely on the fact that we patched it on the module.
+                # BUT this is risky if we create infinite recursion.
+                # Strategy: We need to capture the original function per module.
                 
-                return original_process_node(layer, node_data)
+                # FALLBACK: If we can't find original, fail? 
+                # Actually, let's just define the logic here if possible, OR capture the original
+                # before defining this.
+                
+                # Better strategy: Capture original from one valid source, assuming they are the same function logic.
+                return _original_process_node_ref(layer, node_data)
 
-            # Apply monkey patch
-            functional.process_node = patched_process_node
-        except ImportError:
-            pass # functional module might be elsewhere in different TF versions
+            # Find the original function to keep a reference
+            _original_process_node_ref = None
+            
+            # 1. Identify all modules that need patching
+            modules_to_patch = []
+            for name, module in sys.modules.items():
+                if "keras" in name and "functional" in name and hasattr(module, "process_node"):
+                    modules_to_patch.append(module)
+            
+            # 2. Capture original function (assuming all modules point to same impl or compatible)
+            if modules_to_patch:
+                _original_process_node_ref = modules_to_patch[0].process_node
+                
+            # 3. Apply patch
+            if _original_process_node_ref:
+                for module in modules_to_patch:
+                    # print(f"DEBUG: Patching process_node in {module.__name__}")
+                    module.process_node = patched_process_node
+            else:
+                print("WARNING: Could not find any functional module to patch!")
+                
+        except Exception as e:
+            print(f"FAILED TO MONKEY PATCH: {e}")
+            import traceback
+            traceback.print_exc()
 
         with h5py.File(model_path, 'r') as f:
             if 'model_config' not in f.attrs:
