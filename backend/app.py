@@ -81,12 +81,83 @@ def health():
 
 # Load pre-trained model or use mock model
 model = None
+
+def load_keras3_model_safely(model_path):
+    """
+    Attempts to load a Keras 3 model in a Keras 2 environment by patching configuration.
+    Specifically fixes 'batch_shape' mismatch.
+    """
+    import h5py
+    import json
+    from tensorflow.keras.models import model_from_config
+    
+    print("DEBUG: Attempting to patch Keras 3 config for Keras 2...")
+    try:
+        with h5py.File(model_path, 'r') as f:
+            if 'model_config' not in f.attrs:
+                raise ValueError("No model_config found in h5 file")
+            config_str = f.attrs['model_config']
+            
+        if isinstance(config_str, bytes):
+            config_str = config_str.decode('utf-8')
+        config = json.loads(config_str)
+        
+        # Recursive patch function
+        def patch_config(item):
+            if isinstance(item, dict):
+                # Fix batch_shape -> batch_input_shape (Keras 3 -> Keras 2)
+                if "batch_shape" in item:
+                    item["batch_input_shape"] = item.pop("batch_shape")
+                # Remove dtype policies which might cause issues
+                if "dtype" in item and isinstance(item["dtype"], dict):
+                    item.pop("dtype")
+                # Remove 'synchronized' (BatchNormalization) - Keras 3 specific
+                if "synchronized" in item:
+                    item.pop("synchronized")
+                # Remove 'attributes' - Keras 3 metadata that confuses Keras 2
+                if "attributes" in item:
+                    item.pop("attributes")
+                # Remove build_config and compile_config - often contain incompatible shapes
+                if "build_config" in item:
+                    item.pop("build_config")
+                if "compile_config" in item:
+                    item.pop("compile_config")
+                
+                # Recursive call
+                for key, value in item.items():
+                    patch_config(value)
+            elif isinstance(item, list):
+                for element in item:
+                    patch_config(element)
+        
+        patch_config(config)
+        
+        # Reconstruct model from patched config
+        print("DEBUG: Reconstructing model from patched config...")
+        model = model_from_config(config)
+        
+        # Load weights
+        print("DEBUG: Loading weights...")
+        model.load_weights(model_path)
+        print("DEBUG: Model loaded successfully via patching!")
+        return model
+    except Exception as e:
+        print(f"DEBUG: Patching failed: {e}")
+        return None
+
 try:
     if TF_AVAILABLE:
-        print("DEBUG: Attempting to load model directly via tf.keras.models.load_model...")
-        # Use direct load as suggested by user/ChatGPT, disable compilation to avoid optimizer issues
-        model = tf.keras.models.load_model(MODEL_PATH, compile=False)
-        print("Model loaded successfully!")
+        print("DEBUG: Attempting to load model directly...")
+        try:
+            # First try direct load
+            model = tf.keras.models.load_model(MODEL_PATH, compile=False)
+            print("Model loaded successfully!")
+        except Exception as e:
+            print(f"Direct load failed: {e}. Trying Keras 3 patch...")
+            # If direct load fails (likely due to batch_shape), try patching
+            model = load_keras3_model_safely(MODEL_PATH)
+            if model is None:
+                 raise e # Raise original error if patch also fails
     else:
         print("Skipping model load because TensorFlow is not available.")
 except FileNotFoundError:
@@ -94,8 +165,8 @@ except FileNotFoundError:
 except Exception as e:
     import traceback
     print(f"Error loading model: {e}. Defaulting to MOCK PREDICTIONS.")
-    print("Full traceback:")
-    traceback.print_exc()
+    # print("Full traceback:")
+    # traceback.print_exc()
 
 
 # Define class labels - must match the order used during training
@@ -159,20 +230,24 @@ def predict():
             prediction = model.predict(processed_img)
             class_idx = np.argmax(prediction[0])
             confidence = float(np.max(prediction[0]))
+            source = "Real Model"
         else:
             # Use mock prediction
             class_idx, confidence = mock_predict()
+            source = "Mock Model (TensorFlow unavailable)"
         
         # Confidence Threshold to filter non-medical images
-        # Increased to 0.75 to reduce false positives (like trees)
-        if confidence < 0.75:
+        # Lowered to 0.50 temporarily to debug user's image
+        # If confidence is > 50%, we show the result.
+        if confidence < 0.50:
             diagnosis = "Uncertain"
             response = {
                 "success": True,
                 "prediction": {
                     "class": "Uncertain",
                     "confidence": confidence,
-                    "description": "Low confidence. This may not be a medical image."
+                    "description": "Low confidence. This may not be a medical image.",
+                    "source": source
                 },
                 "response": "I am not sure about this image. It does not look like a standard Chest X-ray. Please upload a clear medical image."
             }
@@ -186,7 +261,8 @@ def predict():
             "prediction": {
                 "class": diagnosis,
                 "confidence": confidence,
-                "description": f"AI detected {diagnosis} with {confidence * 100:.2f}% confidence"
+                "description": f"AI detected {diagnosis} with {confidence * 100:.2f}% confidence",
+                "source": source
             },
             "response": f"Based on the uploaded image, the AI suggests: {diagnosis} (Confidence: {confidence * 100:.2f}%)."
         }
