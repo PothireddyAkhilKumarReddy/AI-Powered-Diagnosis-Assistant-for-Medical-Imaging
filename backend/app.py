@@ -164,8 +164,8 @@ def predict():
             class_idx, confidence = mock_predict()
         
         # Confidence Threshold to filter non-medical images
-        # Apply this check for BOTH real and mock predictions
-        if confidence < 0.60:
+        # Increased to 0.75 to reduce false positives (like trees)
+        if confidence < 0.75:
             diagnosis = "Uncertain"
             response = {
                 "success": True,
