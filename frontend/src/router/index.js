@@ -2,9 +2,10 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomePage from '../pages/HomePage.vue'
 import LoginPage from '../pages/LoginPage.vue'
 import SignupPage from '../pages/SignupPage.vue'
-import DashboardPage from '../pages/DashboardPage.vue'
 import PricingPage from '../pages/PricingPage.vue'
 import AboutPage from '../pages/AboutPage.vue'
+import FaqPage from '../pages/FaqPage.vue'
+import TermsPage from '../pages/TermsPage.vue'
 
 const routes = [
   {
@@ -41,6 +42,18 @@ const routes = [
     path: '/about',
     name: 'About',
     component: AboutPage,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/faq',
+    name: 'FAQ',
+    component: FaqPage,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/terms',
+    name: 'Terms',
+    component: TermsPage,
     meta: { requiresAuth: false }
   }
 ]

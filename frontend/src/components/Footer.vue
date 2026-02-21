@@ -15,8 +15,8 @@
         <router-link to="/" class="footer-link">Homepage</router-link>
         <router-link to="/about" class="footer-link">About Us</router-link>
         <router-link to="/pricing" class="footer-link">Pricing</router-link>
-        <router-link to="/about" class="footer-link">Terms of Use</router-link>
-        <router-link to="/about" class="footer-link">Privacy Policy</router-link>
+        <router-link to="/terms" class="footer-link">Terms of Use</router-link>
+        <router-link to="/terms" class="footer-link">Privacy Policy</router-link>
       </div>
     </div>
   </footer>
