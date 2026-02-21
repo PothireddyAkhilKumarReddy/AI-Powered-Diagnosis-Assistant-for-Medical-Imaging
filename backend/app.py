@@ -8,6 +8,7 @@ Integrated with Gemini API for enhanced chat capabilities
 import os
 import sys
 import json
+import random
 from pathlib import Path
 from dotenv import load_dotenv
 
