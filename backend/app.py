@@ -86,26 +86,24 @@ def load_keras3_model_safely(model_path):
     """
     print("DEBUG: Reconstructing model architecture...")
     try:
-        # Reconstruct the exact architecture from the config dump analysis
-        # Base: DenseNet121
+        # Reconstruct the exact architecture matching Colab notebook (Functional API)
         base_model = tf.keras.applications.DenseNet121(
             include_top=False,
             weights=None, 
             input_shape=(224, 224, 3)
         )
-        base_model.trainable = True # Was trainable in config
+        base_model.trainable = True
 
-        model = tf.keras.Sequential([
-            tf.keras.layers.InputLayer(input_shape=(224, 224, 3)),
-            base_model,
-            tf.keras.layers.GlobalAveragePooling2D(),
-            tf.keras.layers.BatchNormalization(),
-            tf.keras.layers.Dropout(0.5),
-            tf.keras.layers.Dense(512, activation='relu'),
-            tf.keras.layers.BatchNormalization(),
-            tf.keras.layers.Dropout(0.3),
-            tf.keras.layers.Dense(3, activation='softmax')
-        ])
+        inputs = tf.keras.Input(shape=(224, 224, 3))
+        x = base_model(inputs)
+        x = tf.keras.layers.GlobalAveragePooling2D()(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.5)(x)
+        x = tf.keras.layers.Dense(512, activation='relu')(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.3)(x)
+        outputs = tf.keras.layers.Dense(3, activation='softmax')(x)
+        model = tf.keras.Model(inputs, outputs)
         
         print("DEBUG: Loading weights into reconstructed model...")
         # Load weights from the H5 file with partial loading enabled
