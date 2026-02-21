@@ -55,7 +55,7 @@
       <div class="divider"></div>
 
       <!-- FAQ -->
-      <h2 class="section-title">Frequently Asked Questions</h2>
+      <h2 id="faq" class="section-title">Frequently Asked Questions</h2>
       <div class="faq-list">
         <div v-for="(faq, index) in faqs" :key="index" class="faq-item" @click="toggleFaq(index)">
           <div class="faq-question">

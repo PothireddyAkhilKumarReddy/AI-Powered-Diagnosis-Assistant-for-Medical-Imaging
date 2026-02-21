@@ -7,8 +7,11 @@
       </router-link>
       
       <nav class="main-nav">
+        <router-link to="/" class="nav-link">Home</router-link>
         <router-link to="/about" class="nav-link">About Us</router-link>
         <router-link to="/pricing" class="nav-link">Pricing</router-link>
+        <router-link to="/about#faq" class="nav-link">FAQs</router-link>
+        <router-link to="/about" class="nav-link">Terms</router-link>
       </nav>
     </div>
     
