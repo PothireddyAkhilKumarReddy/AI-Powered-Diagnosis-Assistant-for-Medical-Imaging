@@ -59,7 +59,7 @@
           <div class="abstract-shape shape-1"></div>
           <div class="abstract-shape shape-2"></div>
           <div class="main-mockup">
-            <img src="https://images.unsplash.com/photo-1576091160550-2173ff9e5eb4?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" alt="Medical AI" />
+            <img src="https://images.unsplash.com/photo-1666214276389-393fb7dbc75c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="Doctor using advanced medical AI scanner interface" />
             <div class="mockup-overlay"></div>
           </div>
         </div>

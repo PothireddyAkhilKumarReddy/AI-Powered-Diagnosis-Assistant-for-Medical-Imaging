@@ -1,8 +1,10 @@
 <template>
   <div class="app">
-    <Header />
-    <router-view />
-    <Footer />
+    <Header v-if="!['/login', '/signup'].includes($route.path)" />
+    <main class="main-content">
+      <router-view />
+    </main>
+    <Footer v-if="!['/login', '/signup'].includes($route.path)" />
   </div>
 </template>
 
@@ -29,15 +31,6 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-}
-</style>
-
-
-<style scoped>
-.app {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
 }
 
 .main-content {

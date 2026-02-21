@@ -26,8 +26,7 @@
           <button @click="handleLogout" class="btn btn-logout">Logout</button>
         </div>
         <div v-else class="auth-links">
-          <router-link to="/signup" class="btn btn-outline">Sign Up</router-link>
-          <router-link to="/login" class="btn btn-primary">Log In</router-link>
+          <router-link to="/signup" class="btn btn-primary">Get Started</router-link>
         </div>
       </div>
     </div>
