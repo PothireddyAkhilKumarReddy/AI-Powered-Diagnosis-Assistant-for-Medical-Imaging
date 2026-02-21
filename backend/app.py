@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Medical AI Flask Backend
-Trained model: DenseNet121 (3-class: COVID-19, Normal, Pneumonia)
+Trained model: DenseNet121 (4-class: COVID-19, Normal, Pneumonia, Tuberculosis)
 Integrated with Gemini API for enhanced chat capabilities
 """
 
@@ -61,13 +61,14 @@ UPLOADS_DIR = BASE_DIR / 'uploads'
 UPLOADS_DIR.mkdir(exist_ok=True)
 
 # Model classes - must match training order
-CLASS_LABELS = ["COVID-19", "Normal", "Pneumonia"]
+CLASS_LABELS = ["COVID-19", "Normal", "Pneumonia", "Tuberculosis"]
 
 # Class descriptions
 CLASS_DESCRIPTIONS = {
     "COVID-19": "The X-ray shows signs consistent with COVID-19 pneumonia. Please consult a healthcare provider immediately.",
     "Normal": "The X-ray appears normal with no significant findings. However, a medical professional should review for confirmation.",
-    "Pneumonia": "The X-ray shows signs consistent with pneumonia. We recommend immediate medical evaluation."
+    "Pneumonia": "The X-ray shows signs consistent with pneumonia. We recommend immediate medical evaluation.",
+    "Tuberculosis": "The X-ray shows signs consistent with Tuberculosis. We recommend immediate medical evaluation."
 }
 
 # Global model
@@ -97,7 +98,7 @@ def load_keras3_model_safely(model_path):
         x = tf.keras.layers.Dense(512, activation='relu')(x)
         x = tf.keras.layers.BatchNormalization()(x)
         x = tf.keras.layers.Dropout(0.3)(x)
-        outputs = tf.keras.layers.Dense(3, activation='softmax')(x)
+        outputs = tf.keras.layers.Dense(4, activation='softmax')(x)
         model = tf.keras.Model(inputs, outputs)
         
         print("DEBUG: Loading weights into reconstructed model...")
@@ -156,7 +157,7 @@ def load_model():
 def mock_predict():
     """Generate mock prediction for testing"""
     import random
-    class_idx = random.randint(0, 2)
+    class_idx = random.randint(0, 3)
     confidence = random.uniform(0.70, 0.98)
     return class_idx, confidence
 
@@ -436,6 +437,65 @@ def verify_auth():
             }
         }), 200
     except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/auth/google', methods=['POST'])
+def google_login():
+    """Google OAuth 2.0 login/signup endpoint"""
+    try:
+        data = request.get_json()
+        access_token = data.get('access_token')
+        
+        if not access_token:
+            return jsonify({"success": False, "error": "Google access token required"}), 400
+        
+        # Fetch user info from Google's API using the access token
+        import requests
+        response = requests.get(f"https://www.googleapis.com/oauth2/v3/userinfo?access_token={access_token}")
+        
+        if response.status_code != 200:
+            return jsonify({"success": False, "error": "Failed to verify Google token"}), 401
+            
+        user_info = response.json()
+        email = user_info.get('email', '').lower()
+        full_name = user_info.get('name', 'Google User')
+        
+        if not email:
+            return jsonify({"success": False, "error": "Email not provided by Google account"}), 400
+            
+        # Register user if they do not exist
+        if email not in users_db:
+            import uuid
+            users_db[email] = {
+                "id": str(uuid.uuid4()),
+                "password_hash": "", # Intentionally empty for OAuth-only users
+                "fullName": full_name,
+                "phone": "",
+                "email": email
+            }
+            
+        user = users_db[email]
+        
+        # Issue a session token
+        import uuid
+        from datetime import datetime, timedelta
+        token = str(uuid.uuid4())
+        tokens_db[token] = {
+            "email": email,
+            "expiry": (datetime.now() + timedelta(days=7)).isoformat()
+        }
+        
+        return jsonify({
+            "success": True,
+            "token": token,
+            "user": {
+                "id": user['id'],
+                "email": user['email'],
+                "fullName": user['fullName']
+            }
+        }), 200
+    except Exception as e:
+        print(f"Google Auth Error: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 

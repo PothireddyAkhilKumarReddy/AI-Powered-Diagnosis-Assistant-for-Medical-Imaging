@@ -116,7 +116,7 @@
       </div>
 
       <div class="social-buttons">
-        <button class="social-btn google">
+        <button type="button" class="social-btn google" @click.prevent="handleGoogleLogin" title="Sign up with Google">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
             <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -210,12 +210,63 @@ export default {
             router.push('/login')
           }, 1500)
         } else {
-          error.value = data.message || 'Signup failed. Please try again.'
+          error.value = data.error || data.message || 'Signup failed. Please try again.'
         }
       } catch (err) {
-        error.value = 'Connection error. Please check your internet and try again.'
+        error.value = 'Connection error (make sure backend is running). Please check your internet and try again.'
         console.error('Signup error:', err)
       } finally {
+        loading.value = false
+      }
+    }
+
+    const handleGoogleLogin = () => {
+      error.value = ''
+      loading.value = true
+      
+      try {
+        const client = google.accounts.oauth2.initTokenClient({
+          client_id: '184331640474-p8g0qjl3df8cfd6mdpibq1i6epvivkqd.apps.googleusercontent.com',
+          scope: 'email profile',
+          callback: async (tokenResponse) => {
+            if (tokenResponse && tokenResponse.access_token) {
+              try {
+                const response = await fetch('/api/auth/google', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ access_token: tokenResponse.access_token })
+                })
+                
+                const data = await response.json()
+                
+                if (data.success) {
+                  localStorage.setItem('authToken', data.token)
+                  localStorage.setItem('user', JSON.stringify(data.user))
+                  signupSuccess.value = true
+                  setTimeout(() => { window.location.href = '/dashboard' }, 1000)
+                } else {
+                  error.value = data.error || data.message || 'Google signup failed.'
+                }
+              } catch (err) {
+                error.value = 'Connection error during Google signup (make sure backend is running).'
+                console.error(err)
+              } finally {
+                loading.value = false
+              }
+            } else {
+              error.value = 'Failed to get Google authorization.'
+              loading.value = false
+            }
+          },
+          error_callback: () => {
+            error.value = 'Google authentication was cancelled/failed.'
+            loading.value = false
+          }
+        });
+        client.requestAccessToken();
+      } catch (err) {
+        error.value = 'Google Identity Services could not be loaded.'
+        console.error(err)
         loading.value = false
       }
     }
@@ -234,6 +285,7 @@ export default {
       error,
       signupSuccess,
       handleSignup,
+      handleGoogleLogin,
       handleTerms,
       handlePrivacy,
       showPassword,
