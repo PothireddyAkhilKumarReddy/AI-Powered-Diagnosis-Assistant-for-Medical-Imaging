@@ -2,14 +2,20 @@
   "name": "medical-ai-frontend",
   "version": "1.0.0",
   "description": "Frontend for Medical AI Diagnostic Assistant",
-  "main": "index.html",
+  "type": "module",
   "scripts": {
-    "start": "python -m http.server 3000",
-    "build": "mkdir -p public && cp index.html styles.css public/"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "keywords": ["medical", "ai", "diagnostic", "frontend"],
   "author": "Your Name",
   "license": "MIT",
-  "devDependencies": {},
-  "dependencies": {}
+  "dependencies": {
+    "vue": "^3.3.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.3.4",
+    "vite": "^4.4.9"
+  }
 } 

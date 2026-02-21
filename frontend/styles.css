@@ -291,6 +291,11 @@ body {
   align-items: center;
 }
 
+.attach-button {
+  color: #b2bec3;
+  font-size: 0.9rem;
+}
+
 .action-btn {
   background: none;
   border: none;
