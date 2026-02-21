@@ -7,6 +7,7 @@ __pycache__/
 env/
 venv/
 ENV/
+.env
 
 # Model Files
 # We WANT to track model.h5 (24MB is fine)

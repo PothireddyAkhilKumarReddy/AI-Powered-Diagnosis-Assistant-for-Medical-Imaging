@@ -2,12 +2,30 @@
 """
 Medical AI Flask Backend
 Trained model: DenseNet121 (3-class: COVID-19, Normal, Pneumonia)
+Integrated with Gemini API for enhanced chat capabilities
 """
 
 import os
 import sys
 import json
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables for Gemini API
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+try:
+    import google.generativeai as genai
+    if GEMINI_API_KEY:
+        genai.configure(api_key=GEMINI_API_KEY)
+        print("✓ Gemini API configured")
+    else:
+        print("⚠️  GEMINI_API_KEY not found in environment")
+except ImportError:
+    print("⚠️  google-generativeai not installed. Chat features will be limited.")
+except Exception as e:
+    print(f"⚠️  Gemini API error: {e}")
 
 # Suppress TensorFlow warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -16,6 +34,13 @@ os.environ['TF_USE_LEGACY_KERAS'] = '1'
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import numpy as np
+
+# WORKAROUND: Fix for TensorFlow < 2.10 on Windows with newer NumPy
+try:
+    import tensorflow.python.framework.dtypes
+    import tensorflow.python.framework.tensor_util
+except ImportError:
+    pass
 
 # Try to import TensorFlow
 try:
@@ -99,6 +124,13 @@ def preprocess_image(image_path):
     
     return img_array
 
+def sanitize_filename(filename):
+    """Sanitize filename for cross-platform compatibility"""
+    # Remove invalid characters for Windows
+    import re
+    invalid_chars = r'[<>:"/\\|?*]'
+    return re.sub(invalid_chars, '_', filename)
+
 # Routes - Static files
 @app.route('/')
 def index():
@@ -107,12 +139,24 @@ def index():
     except:
         return jsonify({"error": "Frontend not built. Run: npm run build in frontend directory"}), 404
 
+@app.route('/assets/<path:path>')
+def serve_assets(path):
+    """Serve static assets from dist/assets"""
+    try:
+        return send_from_directory(os.path.join(app.static_folder, 'assets'), path)
+    except:
+        return jsonify({"error": f"Asset not found: {path}"}), 404
+
 @app.route('/<path:filename>')
 def serve_static(filename):
     try:
         return send_from_directory(app.static_folder, filename)
     except:
-        return jsonify({"error": f"File not found: {filename}"}), 404
+        # SPA fallback - serve index.html for client-side routing
+        try:
+            return send_from_directory(app.static_folder, 'index.html')
+        except:
+            return jsonify({"error": f"File not found: {filename}"}), 404
 
 # API Routes
 @app.route('/api/health', methods=['GET'])
@@ -124,174 +168,293 @@ def health():
         "tensorflow_available": TF_AVAILABLE,
         "model_loaded": loaded_model is not None,
         "classes": CLASS_LABELS,
-        "mode": "real" if loaded_model else "mock"
+        "mode": "real" if loaded_model else "mock",
+        "gemini_available": GEMINI_API_KEY is not None
     })
 
 @app.route('/api/predict', methods=['POST'])
 def predict():
     """
-    Handle image upload and prediction
-    Expected: multipart/form-data with 'image' file
+    Endpoint to receive an image and return AI-generated diagnosis
     """
+    print("DEBUG: /api/predict endpoint called")
+    if "image" not in request.files:
+        print("DEBUG: No image in request files")
+        return jsonify({"success": False, "error": "Please upload a medical image (X-ray, MRI, CT scan) to get a diagnosis."}), 400
+    
+    file = request.files["image"]
+    print(f"DEBUG: Received file: {file.filename}")
+    
+    # Sanitize filename
+    safe_filename = sanitize_filename(file.filename)
+    img_path = os.path.join(UPLOADS_DIR, safe_filename)
+    file.save(img_path)
+
     try:
-        # Check if image is provided
-        if 'image' not in request.files:
-            return jsonify({
-                "success": False,
-                "error": "No image provided"
-            }), 400
-        
-        file = request.files['image']
-        if file.filename == '':
-            return jsonify({
-                "success": False,
-                "error": "No file selected"
-            }), 400
-        
-        # Validate file type
-        if not file.filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
-            return jsonify({
-                "success": False,
-                "error": "Invalid file type. Please upload an image (JPG, PNG, GIF)"
-            }), 400
-        
-        # Save uploaded file
-        filename = file.filename
-        filepath = UPLOADS_DIR / filename
-        file.save(str(filepath))
-        
-        # Get model and make prediction
         loaded_model = load_model()
+        print(f"DEBUG: Processing image. Model loaded? {loaded_model is not None}")
         
-        if loaded_model is not None:
-            # Real model prediction
-            try:
-                processed_img = preprocess_image(str(filepath))
-                prediction = loaded_model.predict(processed_img, verbose=0)
-                class_idx = int(np.argmax(prediction[0]))
-                confidence = float(np.max(prediction[0]))
-                mode = "real"
-            except Exception as e:
-                print(f"Prediction error: {e}")
-                return jsonify({
-                    "success": False,
-                    "error": f"Prediction failed: {str(e)}"
-                }), 500
+        if TF_AVAILABLE and loaded_model is not None:
+            # Use real model prediction
+            processed_img = preprocess_image(img_path)
+            prediction = loaded_model.predict(processed_img)
+            class_idx = np.argmax(prediction[0])
+            confidence = float(np.max(prediction[0]))
+            
+            response = {
+                "success": True,
+                "prediction": {
+                    "class": CLASS_LABELS[class_idx],
+                    "confidence": confidence,
+                    "description": CLASS_DESCRIPTIONS[CLASS_LABELS[class_idx]],
+                    "all_predictions": {
+                        CLASS_LABELS[i]: float(prediction[0][i])
+                        for i in range(len(CLASS_LABELS))
+                    }
+                },
+                "mode": "real",
+                "filename": safe_filename
+            }
         else:
             # Mock prediction for testing
             class_idx, confidence = mock_predict()
-            mode = "mock"
-        
-        # Get class info
-        class_name = CLASS_LABELS[class_idx]
-        description = CLASS_DESCRIPTIONS.get(class_name, "Diagnosis complete.")
-        
-        response = {
-            "success": True,
-            "prediction": {
-                "class": class_name,
-                "confidence": confidence,
-                "description": description,
-                "all_predictions": {
-                    CLASS_LABELS[i]: float(prediction[0][i]) if loaded_model else None
-                    for i in range(len(CLASS_LABELS))
-                } if loaded_model else None
-            },
-            "mode": mode,
-            "filename": filename
-        }
+            response = {
+                "success": True,
+                "prediction": {
+                    "class": CLASS_LABELS[class_idx],
+                    "confidence": confidence,
+                    "description": CLASS_DESCRIPTIONS[CLASS_LABELS[class_idx]],
+                    "all_predictions": {
+                        CLASS_LABELS[i]: random.uniform(0, 1)
+                        for i in range(len(CLASS_LABELS))
+                    }
+                },
+                "mode": "mock",
+                "filename": safe_filename
+            }
         
         return jsonify(response)
     
     except Exception as e:
-        print(f"Error in /predict: {e}")
+        print(f"Error in /api/predict: {e}")
         return jsonify({
             "success": False,
             "error": f"Server error: {str(e)}"
         }), 500
+    finally:
+        # Clean up uploaded file
+        if os.path.exists(img_path):
+            try:
+                os.remove(img_path)
+            except:
+                pass
 
-@app.route('/api/chat', methods=['POST'])
-def chat():
-    """
-    Chat endpoint for AI health assistant
-    Expected: JSON with 'message' field
-    """
+
+# Authentication endpoints
+users_db = {}  # Mock in-memory user database {email: {password_hash, fullName, phone}}
+tokens_db = {}  # Mock token database {token: {email, expiry}}
+
+def hash_password(password):
+    """Simple password hashing (use bcrypt in production)"""
+    import hashlib
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def generate_token():
+    """Generate a simple token (use JWT in production)"""
+    import uuid
+    return str(uuid.uuid4())
+
+@app.route('/api/auth/signup', methods=['POST'])
+def signup():
+    """User registration endpoint"""
     try:
         data = request.get_json()
+        email = data.get('email', '').lower()
+        password = data.get('password', '')
+        fullName = data.get('fullName', '')
+        phone = data.get('phone', '')
         
-        if not data or 'message' not in data:
-            return jsonify({
-                "success": False,
-                "error": "No message provided"
-            }), 400
+        # Validation
+        if not email or not password or not fullName:
+            return jsonify({"success": False, "error": "Missing required fields"}), 400
         
-        user_message = data.get('message', '').strip()
+        if len(password) < 8:
+            return jsonify({"success": False, "error": "Password must be at least 8 characters"}), 400
         
-        if not user_message:
-            return jsonify({
-                "success": False,
-                "error": "Message cannot be empty"
-            }), 400
+        if email in users_db:
+            return jsonify({"success": False, "error": "Email already registered"}), 400
         
-        # Generate response
-        response_text = generate_chat_response(user_message)
+        # Create user
+        import uuid
+        user_id = str(uuid.uuid4())
+        users_db[email] = {
+            "id": user_id,
+            "password_hash": hash_password(password),
+            "fullName": fullName,
+            "phone": phone,
+            "email": email
+        }
         
         return jsonify({
             "success": True,
-            "response": response_text,
-            "message": user_message
-        })
-    
+            "message": "Account created successfully",
+            "user": {
+                "id": user_id,
+                "email": email,
+                "fullName": fullName
+            }
+        }), 201
     except Exception as e:
-        print(f"Error in /chat: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    """User login endpoint"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').lower()
+        password = data.get('password', '')
+        
+        if not email or not password:
+            return jsonify({"success": False, "error": "Email and password required"}), 400
+        
+        if email not in users_db:
+            return jsonify({"success": False, "error": "Invalid email or password"}), 401
+        
+        user = users_db[email]
+        if user['password_hash'] != hash_password(password):
+            return jsonify({"success": False, "error": "Invalid email or password"}), 401
+        
+        # Generate token
+        import uuid
+        from datetime import datetime, timedelta
+        token = str(uuid.uuid4())
+        tokens_db[token] = {
+            "email": email,
+            "expiry": (datetime.now() + timedelta(days=7)).isoformat()
+        }
+        
+        return jsonify({
+            "success": True,
+            "token": token,
+            "user": {
+                "id": user['id'],
+                "email": user['email'],
+                "fullName": user['fullName']
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/auth/logout', methods=['POST'])
+def logout():
+    """User logout endpoint"""
+    try:
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header[7:]
+            if token in tokens_db:
+                del tokens_db[token]
+        
+        return jsonify({"success": True, "message": "Logged out successfully"}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/auth/verify', methods=['GET'])
+def verify_auth():
+    """Verify authentication token"""
+    try:
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({"success": False, "error": "Unauthorized"}), 401
+        
+        token = auth_header[7:]
+        if token not in tokens_db:
+            return jsonify({"success": False, "error": "Invalid or expired token"}), 401
+        
+        token_data = tokens_db[token]
+        email = token_data['email']
+        user = users_db.get(email)
+        
+        if not user:
+            del tokens_db[token]
+            return jsonify({"success": False, "error": "User not found"}), 401
+        
+        return jsonify({
+            "success": True,
+            "user": {
+                "id": user['id'],
+                "email": user['email'],
+                "fullName": user['fullName']
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# Chat endpoint
+@app.route("/api/chat", methods=["POST"])
+def chat():
+    """Chat endpoint with optional Gemini integration"""
+    try:
+        data = request.get_json()
+        user_message = data.get("message", "").strip()
+        
+        if not user_message:
+            return jsonify({"success": False, "error": "Message is required"}), 400
+        
+        # Try to use Gemini if available
+        if GEMINI_API_KEY:
+            try:
+                model = genai.GenerativeModel('gemini-2.5-flash')
+                response = model.generate_content(user_message)
+                ai_response = response.text
+                return jsonify({
+                    "success": True,
+                    "response": ai_response,
+                    "message": user_message
+                }), 200
+            except Exception as e:
+                print(f"Gemini API error: {e}")
+                # Fall back to keyword-based responses
+        
+        # Fallback: keyword-based responses
+        message_lower = user_message.lower()
+        
+        if any(word in message_lower for word in ['covid', 'coronavirus']):
+            response = "COVID-19 is a viral infection. If you test positive, consult your healthcare provider. Wear masks, maintain distance, and follow local health guidelines."
+        elif any(word in message_lower for word in ['pneumonia', 'lung']):
+            response = "Pneumonia is a lung infection that can be serious. Seek medical attention if you experience persistent cough, fever, or difficulty breathing."
+        elif any(word in message_lower for word in ['fever', 'temperature']):
+            response = "A fever is your body's natural response to infection. Rest, stay hydrated, and monitor your temperature. Seek medical help if fever persists above 103°F (39.4°C)."
+        elif any(word in message_lower for word in ['vaccine', 'vaccination']):
+            response = "Vaccines are safe and effective. Consult your doctor about which vaccines are appropriate for you."
+        elif any(word in message_lower for word in ['mask', 'prevention']):
+            response = "Prevention measures include: wearing masks in crowded areas, washing hands frequently, maintaining distance from sick people, and staying updated with vaccinations."
+        else:
+            response = "I'm an AI health assistant. Please ask about symptoms, prevention, or common health conditions. For serious concerns, always consult a healthcare professional."
+        
+        return jsonify({
+            "success": True,
+            "response": response,
+            "message": user_message
+        }), 200
+    except Exception as e:
         return jsonify({
             "success": False,
             "error": str(e)
         }), 500
 
-def generate_chat_response(user_message):
-    """Generate an AI response to user health questions"""
-    message_lower = user_message.lower()
-    
-    # Simple keyword-based responses (can be replaced with actual AI in future)
-    if any(word in message_lower for word in ['covid', 'coronavirus', 'sars']):
-        return "COVID-19 is a respiratory illness. Please consult a healthcare provider if you experience symptoms like fever, cough, or difficulty breathing. For diagnosis, chest X-rays can be helpful."
-    
-    elif any(word in message_lower for word in ['pneumonia', 'lung infection']):
-        return "Pneumonia is a lung infection that can be serious. Symptoms include cough, fever, and chest pain. Please seek medical attention if you suspect pneumonia."
-    
-    elif any(word in message_lower for word in ['fever', 'cough', 'shortness', 'breath']):
-        return "These symptoms warrant medical evaluation. Please contact a healthcare provider. In the meantime, stay hydrated and rest."
-    
-    elif any(word in message_lower for word in ['xray', 'x-ray', 'radiograph', 'chest']):
-        return "Chest X-rays are a common diagnostic tool for lung and chest issues. They can help detect infections like pneumonia, COVID-19, and other conditions. Always consult with a radiologist or doctor for interpretation."
-    
-    else:
-        return "Thank you for your question. I'm an AI assistant trained on medical imaging. For personalized medical advice, please consult a qualified healthcare provider. You can also upload a chest X-ray for AI analysis."
 
-if __name__ == '__main__':
-    print("\n" + "="*70)
-    print("    🏥 Medical AI Diagnosis Assistant - Flask Backend")
-    print("="*70)
-    print(f"Model path: {MODEL_PATH}")
-    print(f"Model exists: {MODEL_PATH.exists()}")
-    print(f"TensorFlow available: {TF_AVAILABLE}")
-    print(f"Classes: {CLASS_LABELS}")
-    print("="*70)
-    print("\nAPI Endpoints:")
-    print("  GET  /api/health     - Server health check")
-    print("  POST /api/predict    - Upload image for diagnosis")
-    print("  POST /api/chat       - Chat with AI assistant")
-    print("="*70 + "\n")
-    
-    # Try to load model on startup
-    load_model()
-    
-    # Run Flask app
-    app.run(
-        debug=True,
-        host='0.0.0.0',
-        port=5003,
-        use_reloader=False,
-        threaded=True
-    )
+if __name__ == "__main__":
+    # Ensure uploads directory exists
+    os.makedirs("uploads", exist_ok=True)
+    # Run the Flask app
+    print("Starting Medical AI Bot...")
+    print("Frontend will be available at: http://localhost:5003")
+    print("API endpoints:")
+    print("   - POST /api/predict - Upload medical images for diagnosis")
+    print("   - POST /api/chat - Chat with the AI")
+    print("   - POST /api/auth/signup - Register new user")
+    print("   - POST /api/auth/login - Login user")
+    app.run(debug=True, host='0.0.0.0', port=5003)
