@@ -1,9 +1,16 @@
 <template>
   <header class="header">
-    <router-link to="/" class="logo">
-      <div class="menu-icon">📊</div>
-      <span>DiagnoBot</span>
-    </router-link>
+    <div class="header-left">
+      <router-link to="/" class="logo">
+        <div class="menu-icon">📊</div>
+        <span>DiagnoBot</span>
+      </router-link>
+      
+      <nav class="main-nav">
+        <router-link to="/about" class="nav-link">About Us</router-link>
+        <router-link to="/pricing" class="nav-link">Pricing</router-link>
+      </nav>
+    </div>
     
     <div class="header-right">
       <button class="theme-toggle" @click="toggleTheme" :title="isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
@@ -130,6 +137,35 @@ export default {
   align-items: center;
   justify-content: center;
   font-size: 1.2rem;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.main-nav {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.nav-link {
+  color: var(--text-color, #2d3436);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: color 0.3s ease;
+}
+
+.nav-link:hover {
+  color: var(--primary-color, #6c5ce7);
+}
+
+.nav-link.router-link-active {
+  color: var(--primary-color, #6c5ce7);
+  font-weight: 700;
 }
 
 .header-right {
@@ -261,6 +297,10 @@ export default {
     width: 34px;
     height: 34px;
     font-size: 1rem;
+  }
+
+  .main-nav {
+    display: none; /* Hide top nav on mobile, could move to a hamburger menu later */
   }
 }
 </style>

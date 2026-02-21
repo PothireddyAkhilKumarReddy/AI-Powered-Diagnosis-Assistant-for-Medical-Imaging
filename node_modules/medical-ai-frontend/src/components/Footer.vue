@@ -72,6 +72,7 @@ export default {
   gap: 1.5rem;
   justify-content: flex-end;
   flex-wrap: wrap;
+  row-gap: 0.8rem;
 }
 
 .footer-link {
@@ -79,6 +80,7 @@ export default {
   text-decoration: none;
   transition: color 0.3s ease;
   font-size: 0.9rem;
+  white-space: nowrap;
 }
 
 .footer-link:hover {
