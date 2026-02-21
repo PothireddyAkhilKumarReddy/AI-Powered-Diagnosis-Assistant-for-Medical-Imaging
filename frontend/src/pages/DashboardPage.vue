@@ -359,6 +359,16 @@ export default {
   color: #e67e22;
 }
 
+.badge-lung-cancer {
+  background: rgba(142, 68, 173, 0.1);
+  color: #8e44ad;
+}
+
+.badge-pleural-effusion {
+  background: rgba(22, 160, 133, 0.1);
+  color: #16a085;
+}
+
 .badge-success {
   background: rgba(39, 174, 96, 0.1);
   color: #27ae60;

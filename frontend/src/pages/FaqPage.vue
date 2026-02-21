@@ -38,7 +38,7 @@ export default {
       },
       {
         question: 'What types of images can I upload?',
-        answer: 'DiagnoBot is trained on chest X-ray images and can classify them as COVID-19, Pneumonia, Tuberculosis (TB), or Normal. For best results, upload standard frontal chest X-rays in JPG, PNG, or GIF format.'
+        answer: 'DiagnoBot is trained on chest X-ray images and can classify them as COVID-19, Pneumonia, Tuberculosis (TB), Lung Cancer, Pleural Effusion, or Normal. For best results, upload standard frontal chest X-rays in JPG, PNG, or GIF format.'
       },
       {
         question: 'How accurate is the AI diagnosis?',

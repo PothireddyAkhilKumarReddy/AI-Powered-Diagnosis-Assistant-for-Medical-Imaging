@@ -64,13 +64,15 @@ MODEL_PATH = BASE_DIR / 'model.h5'
 UPLOADS_DIR = BASE_DIR / 'uploads'
 UPLOADS_DIR.mkdir(exist_ok=True)
 
-# Model classes - must match training order
-CLASS_LABELS = ["COVID-19", "Normal", "Pneumonia", "Tuberculosis"]
+# Model classes - must match training order (alphabetical)
+CLASS_LABELS = ["COVID-19", "Lung Cancer", "Normal", "Pleural Effusion", "Pneumonia", "Tuberculosis"]
 
 # Class descriptions
 CLASS_DESCRIPTIONS = {
     "COVID-19": "The X-ray shows signs consistent with COVID-19 pneumonia. Please consult a healthcare provider immediately.",
+    "Lung Cancer": "The X-ray shows signs that may be consistent with lung cancer (nodules, masses, or abnormal growths). This finding requires urgent medical evaluation. Please consult an oncologist or pulmonologist immediately for further diagnostic imaging and biopsy.",
     "Normal": "The X-ray appears normal with no significant findings. However, a medical professional should review for confirmation.",
+    "Pleural Effusion": "The X-ray shows signs consistent with pleural effusion (fluid accumulation around the lungs). This can be caused by infections, heart failure, or other conditions. Please seek medical evaluation for proper diagnosis and treatment.",
     "Pneumonia": "The X-ray shows signs consistent with pneumonia. We recommend immediate medical evaluation.",
     "Tuberculosis": "The X-ray shows signs consistent with Tuberculosis (TB). TB is a serious but treatable infectious disease. Please seek immediate medical attention for proper diagnosis and treatment."
 }
@@ -117,7 +119,7 @@ def load_model():
 def mock_predict():
     """Generate mock prediction for testing"""
     import random
-    class_idx = random.randint(0, 3)
+    class_idx = random.randint(0, 5)
     confidence = random.uniform(0.70, 0.98)
     return class_idx, confidence
 

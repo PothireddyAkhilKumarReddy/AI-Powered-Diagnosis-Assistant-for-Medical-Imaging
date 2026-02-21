@@ -20,7 +20,7 @@
         <p class="about-text">
           Our journey combines pioneering advancements in deep learning with real-world medical expertise. 
           DiagnoBot uses a DenseNet121 neural network trained on thousands of chest X-rays to detect 
-          COVID-19, Pneumonia, Tuberculosis (TB), and Normal conditions. Combined with Google's Gemini AI for natural language 
+          COVID-19, Pneumonia, Tuberculosis (TB), Lung Cancer, Pleural Effusion, and Normal conditions. Combined with Google's Gemini AI for natural language 
           understanding, we offer both image-based diagnosis and intelligent health conversations.
         </p>
       </div>
