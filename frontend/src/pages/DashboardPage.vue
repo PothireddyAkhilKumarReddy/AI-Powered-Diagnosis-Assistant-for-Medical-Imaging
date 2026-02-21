@@ -192,6 +192,7 @@ export default {
 .welcome-section h1 {
   font-size: 2.5rem;
   margin-bottom: 0.5rem;
+  color: white;
 }
 
 .welcome-section p {
@@ -237,7 +238,7 @@ export default {
 
 .stat-content p {
   margin: 0.25rem 0 0 0;
-  color: #636e72;
+  color: var(--text-muted);
   font-size: 0.95rem;
 }
 
@@ -315,7 +316,7 @@ export default {
 
 .item-date {
   font-size: 0.9rem;
-  color: #636e72;
+  color: var(--text-muted);
   font-weight: 500;
 }
 
@@ -379,7 +380,7 @@ export default {
   padding: 3rem;
   text-align: center;
   box-shadow: var(--shadow-sm);
-  color: #636e72;
+  color: var(--text-muted);
 }
 
 @media (max-width: 768px) {

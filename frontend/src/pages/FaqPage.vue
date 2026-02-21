@@ -111,7 +111,7 @@ export default {
 }
 
 .faq-subtitle {
-  color: #636e72;
+  color: var(--text-muted);
   font-size: 1.1rem;
   margin-bottom: 3rem;
 }
@@ -160,7 +160,7 @@ export default {
 }
 
 .faq-answer p {
-  color: #636e72;
+  color: var(--text-muted);
   line-height: 1.7;
   font-size: 0.95rem;
   margin: 0;

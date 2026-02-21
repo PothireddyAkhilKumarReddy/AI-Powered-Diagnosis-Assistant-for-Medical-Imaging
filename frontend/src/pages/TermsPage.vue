@@ -87,7 +87,7 @@ export default {
 }
 
 .legal-updated {
-  color: #636e72;
+  color: var(--text-muted);
   font-size: 0.9rem;
   margin-bottom: 2.5rem;
   font-style: italic;
@@ -102,13 +102,13 @@ export default {
 
 .legal-body p {
   line-height: 1.7;
-  color: #4a5568;
+  color: var(--text-muted);
   margin-bottom: 1.5rem;
   font-size: 1.05rem;
 }
 
 html[data-theme='dark'] .legal-body p {
-  color: #b2bec3;
+  color: var(--text-muted);
 }
 
 @media (max-width: 768px) {

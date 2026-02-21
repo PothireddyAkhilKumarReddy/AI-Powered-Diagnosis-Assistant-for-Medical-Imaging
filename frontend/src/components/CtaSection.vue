@@ -81,7 +81,7 @@ export default {
 }
 
 .cta-buttons .btn-primary {
-  background: white;
+  background: var(--surface-color);
   color: var(--primary-dark);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }

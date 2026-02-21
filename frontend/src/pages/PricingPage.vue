@@ -161,7 +161,7 @@ export default {
 }
 
 .pricing-subtitle {
-  color: #636e72;
+  color: var(--text-muted);
   font-size: 1.05rem;
   margin-bottom: 3rem;
   line-height: 1.6;
@@ -276,7 +276,7 @@ export default {
 }
 
 .plan-desc {
-  color: #636e72;
+  color: var(--text-muted);
   font-size: 0.9rem;
   margin: 0;
   line-height: 1.5;
@@ -321,7 +321,7 @@ export default {
 
 .disclaimer-text {
   text-align: center;
-  color: #b2bec3;
+  color: var(--text-muted);
   font-size: 0.8rem;
   margin-top: 0.8rem;
 }
