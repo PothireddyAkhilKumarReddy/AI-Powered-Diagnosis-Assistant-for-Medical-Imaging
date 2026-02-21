@@ -16,8 +16,8 @@ from collections import defaultdict
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 try:
-    from flask import Flask, request, jsonify, send_from_directory
-    from flask_cors import CORS
+    from flask import Flask, request, jsonify, send_from_directory  # type: ignore
+    from flask_cors import CORS  # type: ignore
     print("✓ Flask loaded successfully")
 except ImportError as e:
     print(f"✗ Flask not available: {e}")
