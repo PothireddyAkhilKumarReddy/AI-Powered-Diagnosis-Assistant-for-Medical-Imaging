@@ -8,14 +8,20 @@
     "build": "vite build",
     "preview": "vite preview"
   },
-  "keywords": ["medical", "ai", "diagnostic", "frontend"],
+  "keywords": [
+    "medical",
+    "ai",
+    "diagnostic",
+    "frontend"
+  ],
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
+    "canvas-confetti": "^1.9.4",
     "vue": "^3.3.4"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.3.4",
     "vite": "^4.4.9"
   }
-} 
+}
