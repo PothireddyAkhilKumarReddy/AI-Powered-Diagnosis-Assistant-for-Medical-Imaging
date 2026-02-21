@@ -6,11 +6,7 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/predict': {
-        target: 'http://localhost:5003',
-        changeOrigin: true
-      },
-      '/chat': {
+      '/api': {
         target: 'http://localhost:5003',
         changeOrigin: true
       }
