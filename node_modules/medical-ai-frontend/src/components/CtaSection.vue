@@ -1,7 +1,7 @@
 <template>
   <section class="cta-section">
     <h2 class="cta-title">Try AI Health Chat Now</h2>
-    <button class="cta-button" @click="$emit('scroll-to-chat')">Upgrade Your Plan</button>
+    <router-link to="/pricing" class="cta-button">Upgrade Your Plan</router-link>
   </section>
 </template>
 
@@ -26,6 +26,7 @@ export default {
 }
 
 .cta-button {
+  display: inline-block;
   padding: 0.8rem 2rem;
   background: white;
   color: #667eea;
@@ -35,6 +36,7 @@ export default {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
+  text-decoration: none;
 }
 
 .cta-button:hover {
