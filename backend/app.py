@@ -29,35 +29,31 @@ except Exception as e:
     print(f"WARN  Gemini API error: {e}")
 
 # Constrain memory usage for Render Free Tier (512MB RAM)
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['OMP_NUM_THREADS'] = '1'
-os.environ['TF_NUM_INTEROP_THREADS'] = '1'
-os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import numpy as np
+from PIL import Image
 
-# WORKAROUND: Fix for TensorFlow < 2.10 on Windows with newer NumPy
+# Try to import TFLite runtime (lightweight, ~2MB vs ~620MB for full TensorFlow)
+TFLITE_AVAILABLE = False
+tflite_interpreter = None
 try:
-    import tensorflow.python.framework.dtypes
-    import tensorflow.python.framework.tensor_util
-except ImportError:
-    pass
-
-# Try to import TensorFlow
-try:
-    import tensorflow as tf
-    
-    # Enforce thread limits to prevent OOM
-    tf.config.threading.set_inter_op_parallelism_threads(1)
-    tf.config.threading.set_intra_op_parallelism_threads(1)
-    
-    print("OK  TensorFlow loaded")
-    TF_AVAILABLE = True
+    try:
+        import tflite_runtime.interpreter as tflite
+    except ImportError:
+        # Fallback: use full TensorFlow's TFLite interpreter if tflite_runtime not available
+        import tensorflow as tf
+        tflite = tf.lite
+    TFLITE_AVAILABLE = True
+    print("OK  TFLite runtime loaded")
 except Exception as e:
-    print(f"ERR TensorFlow error: {e}")
-    TF_AVAILABLE = False
+    print(f"ERR TFLite error: {e}")
+    TFLITE_AVAILABLE = False
+
+# Keep TF_AVAILABLE for backward compatibility in health check
+TF_AVAILABLE = TFLITE_AVAILABLE
 
 app = Flask(__name__, static_folder='../frontend/dist', static_url_path='')
 CORS(app)
@@ -83,81 +79,37 @@ CLASS_DESCRIPTIONS = {
 model = None
 model_loaded = False
 
-def load_keras3_model_safely(model_path):
-    """
-    Reconstructs the model architecture in code and loads weights.
-    This bypasses Keras 3 -> Keras 2 config incompatibility.
-    """
-    print("DEBUG: Reconstructing model architecture...")
-    try:
-        # Reconstruct the exact architecture matching Colab notebook (Functional API)
-        base_model = tf.keras.applications.DenseNet121(
-            include_top=False,
-            weights=None, 
-            input_shape=(224, 224, 3)
-        )
-        base_model.trainable = True
-
-        inputs = tf.keras.Input(shape=(224, 224, 3))
-        x = base_model(inputs)
-        x = tf.keras.layers.GlobalAveragePooling2D()(x)
-        x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Dropout(0.5)(x)
-        x = tf.keras.layers.Dense(512, activation='relu')(x)
-        x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Dropout(0.3)(x)
-        outputs = tf.keras.layers.Dense(4, activation='softmax')(x)
-        model = tf.keras.Model(inputs, outputs)
-        
-        print("DEBUG: Loading weights into reconstructed model...")
-        try:
-            model.load_weights(str(model_path), by_name=True, skip_mismatch=True)
-            print("DEBUG: Model weighted loaded successfully (partial/by_name)!")
-            return model
-        except Exception as e:
-             print(f"DEBUG: Standard load_weights failed: {e}")
-             print("Falling back to None.")
-             return None
-    except Exception as e:
-        print(f"DEBUG: Reconstruction failed: {e}")
-        return None
-
 def load_model():
-    """Load the trained model safely"""
+    """Load the TFLite model into an interpreter"""
     global model, model_loaded
     
     if model_loaded:
         return model
     
-    if not TF_AVAILABLE:
-        print("WARN  TensorFlow not available. Using mock mode.")
+    if not TFLITE_AVAILABLE:
+        print("WARN  TFLite not available. Using mock mode.")
         model_loaded = True
         return None
     
-    print("Loading AI model...")
-    try:
-        if not MODEL_PATH.exists():
-            print(f"WARN  Model file not found at {MODEL_PATH}")
-            raise FileNotFoundError(f"Model not found: {MODEL_PATH}")
-        
-        # Try direct load first
-        try:
-            model = tf.keras.models.load_model(str(MODEL_PATH), compile=False)
-            print("OK  Model loaded successfully!")
-        except Exception as e:
-            print(f"ERR Direct load failed: {e}")
-            print("Trying Keras 3 compatibility patch...")
-            model = load_keras3_model_safely(MODEL_PATH)
-            
-            if model is not None:
-                print("OK  Model loaded with compatibility patch.")
-            else:
-                raise ValueError("Both direct load and patch failed.")
-
+    # Check for TFLite model first, then fall back to .h5
+    tflite_path = BASE_DIR / 'model.tflite'
+    
+    if not tflite_path.exists():
+        print(f"WARN  TFLite model not found at {tflite_path}")
+        print("WARN  Falling back to mock predictions")
         model_loaded = True
+        return None
+    
+    print("Loading TFLite model...")
+    try:
+        interpreter = tflite.Interpreter(model_path=str(tflite_path), num_threads=1)
+        interpreter.allocate_tensors()
+        model = interpreter
+        model_loaded = True
+        print("OK  TFLite model loaded successfully!")
         return model
     except Exception as e:
-        print(f"ERR Error loading model: {e}")
+        print(f"ERR Error loading TFLite model: {e}")
         print("WARN  Falling back to mock predictions")
         model_loaded = True
         return None
@@ -170,14 +122,11 @@ def mock_predict():
     return class_idx, confidence
 
 def preprocess_image(image_path):
-    """Preprocess image for model inference"""
-    from tensorflow.keras.preprocessing import image
-    
-    img = image.load_img(image_path, target_size=(224, 224))
-    img_array = image.img_to_array(img)
+    """Preprocess image for TFLite inference using Pillow (no TensorFlow needed)"""
+    img = Image.open(image_path).convert('RGB')
+    img = img.resize((224, 224))
+    img_array = np.array(img, dtype=np.float32) / 255.0
     img_array = np.expand_dims(img_array, axis=0)
-    img_array = img_array / 255.0  # Normalize to [0, 1]
-    
     return img_array
 
 def sanitize_filename(filename):
@@ -250,10 +199,22 @@ def predict():
         loaded_model = load_model()
         print(f"DEBUG: Processing image. Model loaded? {loaded_model is not None}")
         
-        if TF_AVAILABLE and loaded_model is not None:
-            # Use real model prediction
+        if TFLITE_AVAILABLE and loaded_model is not None:
+            # Use TFLite model prediction
             processed_img = preprocess_image(img_path)
-            prediction = loaded_model.predict(processed_img)
+            
+            input_details = loaded_model.get_input_details()
+            output_details = loaded_model.get_output_details()
+            
+            # Handle float16 quantized models
+            input_dtype = input_details[0]['dtype']
+            if input_dtype == np.float16:
+                processed_img = processed_img.astype(np.float16)
+            
+            loaded_model.set_tensor(input_details[0]['index'], processed_img)
+            loaded_model.invoke()
+            prediction = loaded_model.get_tensor(output_details[0]['index'])
+            
             class_idx = np.argmax(prediction[0])
             confidence = float(np.max(prediction[0]))
             
