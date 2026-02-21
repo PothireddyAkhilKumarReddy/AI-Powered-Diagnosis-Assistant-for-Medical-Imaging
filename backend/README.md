@@ -39,7 +39,7 @@ pip install -r requirements.txt
 # Start the Flask development server
 python app.py
 
-# Server will be available at http://localhost:5001
+# Server will be available at http://localhost:5003
 ```
 
 ## 🔌 API Endpoints
@@ -126,7 +126,7 @@ railway up
 
 ## 🔧 Environment Variables
 
-- `PORT` - Server port (default: 5001)
+- `PORT` - Server port (default: 5003)
 - `FLASK_ENV` - Development/production mode
 - `MODEL_PATH` - Path to model file
 

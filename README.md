@@ -38,7 +38,7 @@ pip install -r requirements.txt
 # Start the server
 python app.py
 
-# Open http://localhost:5001 in your browser
+# Open http://localhost:5003 in your browser
 ```
 
 ### Option 2: Run Frontend and Backend Separately

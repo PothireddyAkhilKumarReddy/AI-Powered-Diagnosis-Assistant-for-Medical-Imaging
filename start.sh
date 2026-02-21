@@ -25,7 +25,7 @@ fi
 
 # Start the server
 echo "🌐 Starting Flask server..."
-echo "📱 Frontend will be available at: http://localhost:5001"
+echo "📱 Frontend will be available at: http://localhost:3000"
 echo "🔧 API endpoints:"
 echo "   - POST /predict - Upload medical images for diagnosis"
 echo "   - POST /chat - Chat with the AI"
