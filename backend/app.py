@@ -196,8 +196,15 @@ def predict():
         return jsonify({"success": False, "error": "Please upload a medical image (X-ray, MRI, CT scan) to get a diagnosis."}), 400
     
     file = request.files["image"]
-    print(f"DEBUG: Received file: {file.filename}")
-    img_path = os.path.join("uploads", file.filename)
+    
+    # FIX: Secure the filename and ensure the directory exists 
+    # to prevent [Errno 22] Invalid argument on Windows
+    from werkzeug.utils import secure_filename
+    os.makedirs(os.path.join(BASE_DIR, "uploads"), exist_ok=True)
+    filename = secure_filename(file.filename)
+    
+    print(f"DEBUG: Received file: {filename}")
+    img_path = os.path.join(BASE_DIR, "uploads", filename)
     file.save(img_path)
 
     try:
