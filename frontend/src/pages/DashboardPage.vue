@@ -353,6 +353,11 @@ export default {
   color: #f39c12;
 }
 
+.badge-tuberculosis {
+  background: rgba(230, 126, 34, 0.1);
+  color: #e67e22;
+}
+
 .badge-success {
   background: rgba(39, 174, 96, 0.1);
   color: #27ae60;

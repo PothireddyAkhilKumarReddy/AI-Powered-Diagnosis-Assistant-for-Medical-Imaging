@@ -61,13 +61,14 @@ UPLOADS_DIR = BASE_DIR / 'uploads'
 UPLOADS_DIR.mkdir(exist_ok=True)
 
 # Model classes - must match training order
-CLASS_LABELS = ["COVID-19", "Normal", "Pneumonia"]
+CLASS_LABELS = ["COVID-19", "Normal", "Pneumonia", "Tuberculosis"]
 
 # Class descriptions
 CLASS_DESCRIPTIONS = {
     "COVID-19": "The X-ray shows signs consistent with COVID-19 pneumonia. Please consult a healthcare provider immediately.",
     "Normal": "The X-ray appears normal with no significant findings. However, a medical professional should review for confirmation.",
-    "Pneumonia": "The X-ray shows signs consistent with pneumonia. We recommend immediate medical evaluation."
+    "Pneumonia": "The X-ray shows signs consistent with pneumonia. We recommend immediate medical evaluation.",
+    "Tuberculosis": "The X-ray shows signs consistent with Tuberculosis (TB). TB is a serious but treatable infectious disease. Please seek immediate medical attention for proper diagnosis and treatment."
 }
 
 # Global model
@@ -97,7 +98,7 @@ def load_keras3_model_safely(model_path):
         x = tf.keras.layers.Dense(512, activation='relu')(x)
         x = tf.keras.layers.BatchNormalization()(x)
         x = tf.keras.layers.Dropout(0.3)(x)
-        outputs = tf.keras.layers.Dense(3, activation='softmax')(x)
+        outputs = tf.keras.layers.Dense(4, activation='softmax')(x)
         model = tf.keras.Model(inputs, outputs)
         
         print("DEBUG: Loading weights into reconstructed model...")
@@ -156,7 +157,7 @@ def load_model():
 def mock_predict():
     """Generate mock prediction for testing"""
     import random
-    class_idx = random.randint(0, 2)
+    class_idx = random.randint(0, 3)
     confidence = random.uniform(0.70, 0.98)
     return class_idx, confidence
 
