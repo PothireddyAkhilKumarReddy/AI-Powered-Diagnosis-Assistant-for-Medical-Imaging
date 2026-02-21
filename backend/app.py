@@ -1,269 +1,297 @@
-# app.py
+#!/usr/bin/env python3
+"""
+Medical AI Flask Backend
+Trained model: DenseNet121 (3-class: COVID-19, Normal, Pneumonia)
+"""
+
+import os
+import sys
+import json
+from pathlib import Path
+
+# Suppress TensorFlow warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_USE_LEGACY_KERAS'] = '1'
+
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+import numpy as np
 
-
-# WORKAROUND: Fix for TensorFlow < 2.10 on Windows with newer NumPy
-try:
-    import tensorflow.python.framework.dtypes
-    import tensorflow.python.framework.tensor_util
-except ImportError:
-    pass
-
+# Try to import TensorFlow
 try:
     import tensorflow as tf
-    try:
-        from tensorflow import keras
-    except ImportError:
-        import keras
-    
-    # Try exposing functional for monkey patching later
-    try:
-        from keras.engine import functional
-    except ImportError:
-        try:
-            from tensorflow.python.keras.engine import functional
-        except ImportError:
-             # Just in case, try through tf.keras
-            pass
-            
-    load_model = tf.keras.models.load_model
-    image = tf.keras.preprocessing.image
+    print("✓ TensorFlow loaded")
     TF_AVAILABLE = True
-    print(f"TensorFlow version: {tf.__version__}")
-except ImportError as e:
-    TF_AVAILABLE = False
-    print(f"TensorFlow not found. Error: {e}")
 except Exception as e:
+    print(f"✗ TensorFlow error: {e}")
     TF_AVAILABLE = False
-    print(f"Unexpected error importing TensorFlow: {e}")
 
-# WORKAROUND: Fix 'batch_shape' and 'DTypePolicy' errors when loading Keras 3 model in Keras 2
-if TF_AVAILABLE:
-    # WORKAROUND: Raw Model Configuration Patch
-    # Instead of subclassing every layer, we load the model config, patch it, and reload.
-    import json
+app = Flask(__name__, static_folder='../frontend/dist', static_url_path='')
+CORS(app)
+
+# Configuration
+BASE_DIR = Path(__file__).parent
+MODEL_PATH = BASE_DIR / 'model.h5'
+UPLOADS_DIR = BASE_DIR / 'uploads'
+UPLOADS_DIR.mkdir(exist_ok=True)
+
+# Model classes - must match training order
+CLASS_LABELS = ["COVID-19", "Normal", "Pneumonia"]
+
+# Class descriptions
+CLASS_DESCRIPTIONS = {
+    "COVID-19": "The X-ray shows signs consistent with COVID-19 pneumonia. Please consult a healthcare provider immediately.",
+    "Normal": "The X-ray appears normal with no significant findings. However, a medical professional should review for confirmation.",
+    "Pneumonia": "The X-ray shows signs consistent with pneumonia. We recommend immediate medical evaluation."
+}
+
+# Global model
+model = None
+model_loaded = False
+
+def load_model():
+    """Load the trained model safely"""
+    global model, model_loaded
     
-    custom_objects = {} # No longer needed with this approach
-
-try:
-    import numpy as np
-    NP_AVAILABLE = True
-except ImportError:
-    NP_AVAILABLE = False
-    print("NumPy not found. Using pure Python mocks.")
+    if model_loaded:
+        return model
     
-import os
-import random
-import pprint
-
-app = Flask(__name__, static_folder='../frontend', static_url_path='')
-CORS(app)  # Enable CORS for frontend-backend communication
-
-# Get the base directory
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, 'model.h5')
-
-# Serve static files
-@app.route('/')
-def index():
-    return send_from_directory('../frontend', 'index.html')
-
-# Serve other static files
-@app.route('/<path:path>')
-def serve_static(path):
-    return send_from_directory('../frontend', path)
-
-# Health check endpoint
-@app.route('/health')
-def health():
-    return jsonify({"status": "healthy", "tf_available": TF_AVAILABLE, "model_loaded": model is not None})
-
-def load_keras3_model_safely(model_path):
-    """
-    Reconstructs the model architecture in code and loads weights.
-    This bypasses Keras 3 -> Keras 2 config incompatibility.
-    """
-    print("DEBUG: Reconstructing model architecture...")
+    if not TF_AVAILABLE:
+        print("⚠️  TensorFlow not available. Using mock mode.")
+        model_loaded = True
+        return None
+    
+    print("Loading AI model...")
     try:
-        # Reconstruct the exact architecture matching Colab notebook (Functional API)
-        base_model = tf.keras.applications.DenseNet121(
-            include_top=False,
-            weights=None, 
-            input_shape=(224, 224, 3)
-        )
-        base_model.trainable = True
-
-        inputs = tf.keras.Input(shape=(224, 224, 3))
-        x = base_model(inputs)
-        x = tf.keras.layers.GlobalAveragePooling2D()(x)
-        x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Dropout(0.5)(x)
-        x = tf.keras.layers.Dense(512, activation='relu')(x)
-        x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Dropout(0.3)(x)
-        outputs = tf.keras.layers.Dense(3, activation='softmax')(x)
-        model = tf.keras.Model(inputs, outputs)
+        if not MODEL_PATH.exists():
+            print(f"⚠️  Model file not found at {MODEL_PATH}")
+            raise FileNotFoundError(f"Model not found: {MODEL_PATH}")
         
-        print("DEBUG: Loading weights into reconstructed model...")
-        # Load weights from the H5 file with partial loading enabled
-        try:
-            model.load_weights(model_path, by_name=True, skip_mismatch=True)
-            print("DEBUG: Model weighted loaded successfully (partial/by_name)!")
-            return model
-        except Exception as e:
-             print(f"DEBUG: Standard load_weights failed: {e}")
-             # Final fallback: Try loading without skip_mismatch just in case? 
-             # No, if that failed, we are done. Be silent or re-raise?
-             print("Falling back to None.")
-             return None
+        # Load model with TensorFlow
+        model = tf.keras.models.load_model(
+            str(MODEL_PATH),
+            compile=False
+        )
+        print("✓ Model loaded successfully!")
+        model_loaded = True
+        return model
     except Exception as e:
-        print(f"DEBUG: Reconstruction failed: {e}")
-        # Last resort: Try very aggressive patching? No, if this fails, we are stuck.
+        print(f"✗ Error loading model: {e}")
+        print("⚠️  Falling back to mock predictions")
+        model_loaded = True
         return None
 
-try:
-    if TF_AVAILABLE:
-        print(f"DEBUG: TensorFlow Version: {tf.__version__}")
-        print("DEBUG: Attempting to load model...")
-        
-        try:
-            model = tf.keras.models.load_model(MODEL_PATH, compile=False)
-            print("Model loaded successfully!")
-        except Exception as e:
-            print(f"Direct load failed: {e}")
-            print("Trying compatibility patch...")
-            model = load_keras3_model_safely(MODEL_PATH)
-            if model is not None:
-                print("Model loaded with patch.")
-            else:
-                print("Patch failed. Defaulting to MOCK.")
-    else:
-        print("TensorFlow not available. Using mock mode.")
-except Exception as e:
-    print(f"Error loading model: {e}")
-    print("Defaulting to MOCK PREDICTIONS.")
-    model = None
+def mock_predict():
+    """Generate mock prediction for testing"""
+    import random
+    class_idx = random.randint(0, 2)
+    confidence = random.uniform(0.70, 0.98)
+    return class_idx, confidence
 
-
-
-# Define class labels - must match the order used during training
-labels = ["COVID-19", "Normal", "Pneumonia"]  # Match the training order
-
-def preprocess_image(img_path):
-    """
-    Preprocess the uploaded image to match model input requirements.
-    """
-    if not TF_AVAILABLE or not NP_AVAILABLE:
-        raise ImportError("TensorFlow or NumPy not available")
-        
-    img = image.load_img(img_path, target_size=(224, 224))
+def preprocess_image(image_path):
+    """Preprocess image for model inference"""
+    from tensorflow.keras.preprocessing import image
+    
+    img = image.load_img(image_path, target_size=(224, 224))
     img_array = image.img_to_array(img)
     img_array = np.expand_dims(img_array, axis=0)
-    # Normalize pixel values to [0, 1] as done during training
-    img_array /= 255.0
+    img_array = img_array / 255.0  # Normalize to [0, 1]
+    
     return img_array
 
-def mock_predict():
+# Routes - Static files
+@app.route('/')
+def index():
+    try:
+        return send_from_directory(app.static_folder, 'index.html')
+    except:
+        return jsonify({"error": "Frontend not built. Run: npm run build in frontend directory"}), 404
 
-    """
-    Generate a mock prediction for demonstration purposes.
-    """
-    if NP_AVAILABLE:
-        # Simulate model prediction with random results using numpy
-        prediction = np.random.rand(len(labels))
-        prediction = prediction / np.sum(prediction)  # Normalize to probabilities
-        class_idx = np.argmax(prediction)
-        confidence = float(np.max(prediction))
-        return class_idx, confidence
-    else:
-        # Pure python implementation
-        prediction = [random.random() for _ in range(len(labels))]
-        total = sum(prediction)
-        prediction = [p/total for p in prediction]
-        confidence = max(prediction)
-        class_idx = prediction.index(confidence)
-        return class_idx, confidence
+@app.route('/<path:filename>')
+def serve_static(filename):
+    try:
+        return send_from_directory(app.static_folder, filename)
+    except:
+        return jsonify({"error": f"File not found: {filename}"}), 404
 
-@app.route("/predict", methods=["POST"])
+# API Routes
+@app.route('/api/health', methods=['GET'])
+def health():
+    """Health check endpoint"""
+    loaded_model = load_model()
+    return jsonify({
+        "status": "healthy",
+        "tensorflow_available": TF_AVAILABLE,
+        "model_loaded": loaded_model is not None,
+        "classes": CLASS_LABELS,
+        "mode": "real" if loaded_model else "mock"
+    })
+
+@app.route('/api/predict', methods=['POST'])
 def predict():
     """
-    Endpoint to receive an image and return AI-generated diagnosis in a conversational format.
+    Handle image upload and prediction
+    Expected: multipart/form-data with 'image' file
     """
-    print("DEBUG: /predict endpoint called")
-    if "image" not in request.files:
-        print("DEBUG: No image in request files")
-        return jsonify({"success": False, "error": "Please upload a medical image (X-ray, MRI, CT scan) to get a diagnosis."}), 400
-    
-    file = request.files["image"]
-    print(f"DEBUG: Received file: {file.filename}")
-    img_path = os.path.join("uploads", file.filename)
-    file.save(img_path)
-
     try:
-        print(f"DEBUG: Processing image. Model loaded? {model is not None}")
-        if TF_AVAILABLE and NP_AVAILABLE and model is not None:
-            # Use real model prediction
-            processed_img = preprocess_image(img_path)
-            prediction = model.predict(processed_img)
-            class_idx = np.argmax(prediction[0])
-            confidence = float(np.max(prediction[0]))
-            source = "Real Model"
-        else:
-            # Use mock prediction
-            class_idx, confidence = mock_predict()
-            source = "Mock Model (TensorFlow unavailable)"
+        # Check if image is provided
+        if 'image' not in request.files:
+            return jsonify({
+                "success": False,
+                "error": "No image provided"
+            }), 400
         
-        # Confidence Threshold to filter non-medical images
-        # Lowered to 0.50 temporarily to debug user's image
-        # If confidence is > 50%, we show the result.
-        if confidence < 0.50:
-            diagnosis = "Uncertain"
-            response = {
-                "success": True,
-                "prediction": {
-                    "class": "Uncertain",
-                    "confidence": confidence,
-                    "description": "Low confidence. This may not be a medical image.",
-                    "source": source
-                },
-                "response": "I am not sure about this image. It does not look like a standard Chest X-ray. Please upload a clear medical image."
-            }
-            return jsonify(response)
-
-        diagnosis = labels[class_idx]
-
-        # Return response format that frontend expects
+        file = request.files['image']
+        if file.filename == '':
+            return jsonify({
+                "success": False,
+                "error": "No file selected"
+            }), 400
+        
+        # Validate file type
+        if not file.filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
+            return jsonify({
+                "success": False,
+                "error": "Invalid file type. Please upload an image (JPG, PNG, GIF)"
+            }), 400
+        
+        # Save uploaded file
+        filename = file.filename
+        filepath = UPLOADS_DIR / filename
+        file.save(str(filepath))
+        
+        # Get model and make prediction
+        loaded_model = load_model()
+        
+        if loaded_model is not None:
+            # Real model prediction
+            try:
+                processed_img = preprocess_image(str(filepath))
+                prediction = loaded_model.predict(processed_img, verbose=0)
+                class_idx = int(np.argmax(prediction[0]))
+                confidence = float(np.max(prediction[0]))
+                mode = "real"
+            except Exception as e:
+                print(f"Prediction error: {e}")
+                return jsonify({
+                    "success": False,
+                    "error": f"Prediction failed: {str(e)}"
+                }), 500
+        else:
+            # Mock prediction for testing
+            class_idx, confidence = mock_predict()
+            mode = "mock"
+        
+        # Get class info
+        class_name = CLASS_LABELS[class_idx]
+        description = CLASS_DESCRIPTIONS.get(class_name, "Diagnosis complete.")
+        
         response = {
             "success": True,
             "prediction": {
-                "class": diagnosis,
+                "class": class_name,
                 "confidence": confidence,
-                "description": f"AI detected {diagnosis} with {confidence * 100:.2f}% confidence",
-                "source": source
+                "description": description,
+                "all_predictions": {
+                    CLASS_LABELS[i]: float(prediction[0][i]) if loaded_model else None
+                    for i in range(len(CLASS_LABELS))
+                } if loaded_model else None
             },
-            "response": f"Based on the uploaded image, the AI suggests: {diagnosis} (Confidence: {confidence * 100:.2f}%)."
+            "mode": mode,
+            "filename": filename
         }
+        
         return jsonify(response)
+    
     except Exception as e:
-        return jsonify({"success": False, "error": f"An error occurred: {str(e)}"}), 500
+        print(f"Error in /predict: {e}")
+        return jsonify({
+            "success": False,
+            "error": f"Server error: {str(e)}"
+        }), 500
 
-
-# Placeholder for future chatbot/conversation features
-@app.route("/chat", methods=["POST"])
+@app.route('/api/chat', methods=['POST'])
 def chat():
-    data = request.get_json()
-    user_message = data.get("message", "")
-    # For now, just echo the message. Extend this for real chat features.
-    return jsonify({"response": f"You said: {user_message}. Chat features coming soon!"})
+    """
+    Chat endpoint for AI health assistant
+    Expected: JSON with 'message' field
+    """
+    try:
+        data = request.get_json()
+        
+        if not data or 'message' not in data:
+            return jsonify({
+                "success": False,
+                "error": "No message provided"
+            }), 400
+        
+        user_message = data.get('message', '').strip()
+        
+        if not user_message:
+            return jsonify({
+                "success": False,
+                "error": "Message cannot be empty"
+            }), 400
+        
+        # Generate response
+        response_text = generate_chat_response(user_message)
+        
+        return jsonify({
+            "success": True,
+            "response": response_text,
+            "message": user_message
+        })
+    
+    except Exception as e:
+        print(f"Error in /chat: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
-if __name__ == "__main__":
-    # Ensure uploads directory exists
-    os.makedirs("uploads", exist_ok=True)
-    # Run the Flask app
-    print("Starting Medical AI Bot...")
-    print("Frontend will be available at: http://localhost:5003")
-    print("API endpoints:")
-    print("   - POST /predict - Upload medical images for diagnosis")
-    print("   - POST /chat - Chat with the AI (coming soon)")
-    app.run(debug=True, host='0.0.0.0', port=5003)
+def generate_chat_response(user_message):
+    """Generate an AI response to user health questions"""
+    message_lower = user_message.lower()
+    
+    # Simple keyword-based responses (can be replaced with actual AI in future)
+    if any(word in message_lower for word in ['covid', 'coronavirus', 'sars']):
+        return "COVID-19 is a respiratory illness. Please consult a healthcare provider if you experience symptoms like fever, cough, or difficulty breathing. For diagnosis, chest X-rays can be helpful."
+    
+    elif any(word in message_lower for word in ['pneumonia', 'lung infection']):
+        return "Pneumonia is a lung infection that can be serious. Symptoms include cough, fever, and chest pain. Please seek medical attention if you suspect pneumonia."
+    
+    elif any(word in message_lower for word in ['fever', 'cough', 'shortness', 'breath']):
+        return "These symptoms warrant medical evaluation. Please contact a healthcare provider. In the meantime, stay hydrated and rest."
+    
+    elif any(word in message_lower for word in ['xray', 'x-ray', 'radiograph', 'chest']):
+        return "Chest X-rays are a common diagnostic tool for lung and chest issues. They can help detect infections like pneumonia, COVID-19, and other conditions. Always consult with a radiologist or doctor for interpretation."
+    
+    else:
+        return "Thank you for your question. I'm an AI assistant trained on medical imaging. For personalized medical advice, please consult a qualified healthcare provider. You can also upload a chest X-ray for AI analysis."
+
+if __name__ == '__main__':
+    print("\n" + "="*70)
+    print("    🏥 Medical AI Diagnosis Assistant - Flask Backend")
+    print("="*70)
+    print(f"Model path: {MODEL_PATH}")
+    print(f"Model exists: {MODEL_PATH.exists()}")
+    print(f"TensorFlow available: {TF_AVAILABLE}")
+    print(f"Classes: {CLASS_LABELS}")
+    print("="*70)
+    print("\nAPI Endpoints:")
+    print("  GET  /api/health     - Server health check")
+    print("  POST /api/predict    - Upload image for diagnosis")
+    print("  POST /api/chat       - Chat with AI assistant")
+    print("="*70 + "\n")
+    
+    # Try to load model on startup
+    load_model()
+    
+    # Run Flask app
+    app.run(
+        debug=True,
+        host='0.0.0.0',
+        port=5003,
+        use_reloader=False,
+        threaded=True
+    )

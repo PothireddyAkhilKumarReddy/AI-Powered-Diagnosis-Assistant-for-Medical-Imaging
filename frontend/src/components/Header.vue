@@ -1,19 +1,68 @@
 <template>
   <header class="header">
-    <div class="logo">
-      <div class="menu-icon">☰</div>
+    <router-link to="/" class="logo">
+      <div class="menu-icon">📊</div>
       <span>DiagnoBot</span>
-    </div>
+    </router-link>
+    
     <div class="auth-buttons">
-      <button class="btn btn-outline">Sign Up</button>
-      <button class="btn btn-primary">Log In</button>
+      <div v-if="isAuthenticated" class="user-menu">
+        <span class="user-name">{{ userName }}</span>
+        <button @click="handleLogout" class="btn btn-logout">Logout</button>
+      </div>
+      <div v-else class="auth-links">
+        <router-link to="/signup" class="btn btn-outline">Sign Up</router-link>
+        <router-link to="/login" class="btn btn-primary">Log In</router-link>
+      </div>
     </div>
   </header>
 </template>
 
 <script>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+
 export default {
-  name: 'Header'
+  name: 'Header',
+  setup() {
+    const router = useRouter()
+    const isAuthenticated = ref(false)
+    const userName = ref('')
+
+    onMounted(() => {
+      checkAuthStatus()
+    })
+
+    const checkAuthStatus = () => {
+      const authToken = localStorage.getItem('authToken')
+      const user = localStorage.getItem('user')
+      
+      isAuthenticated.value = !!authToken
+      if (user) {
+        try {
+          const userData = JSON.parse(user)
+          userName.value = userData.fullName || userData.email || 'User'
+        } catch (e) {
+          console.error('Error parsing user data:', e)
+        }
+      }
+    }
+
+    const handleLogout = () => {
+      if (confirm('Are you sure you want to logout?')) {
+        localStorage.removeItem('authToken')
+        localStorage.removeItem('user')
+        isAuthenticated.value = false
+        router.push('/login')
+      }
+    }
+
+    return {
+      isAuthenticated,
+      userName,
+      handleLogout
+    }
+  }
 }
 </script>
 
@@ -37,6 +86,13 @@ export default {
   font-size: 1.5rem;
   font-weight: bold;
   color: #6c5ce7;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.logo:hover {
+  color: #764ba2;
 }
 
 .menu-icon {
@@ -55,6 +111,28 @@ export default {
   align-items: center;
 }
 
+.auth-links {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.user-menu {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.user-name {
+  font-size: 14px;
+  color: #2d3436;
+  font-weight: 500;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .btn {
   padding: 0.5rem 1rem;
   border: none;
@@ -62,6 +140,8 @@ export default {
   font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-block;
 }
 
 .btn-outline {
@@ -72,6 +152,8 @@ export default {
 
 .btn-outline:hover {
   background: #f0f0f0;
+  border-color: #6c5ce7;
+  color: #6c5ce7;
 }
 
 .btn-primary {
@@ -81,6 +163,45 @@ export default {
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(108, 92, 231, 0.3);
+  box-shadow: 0 5px 15px rgba(108, 92, 231, 0.4);
+}
+
+.btn-logout {
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, #d63031, #fab1a0);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-logout:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(214, 48, 49, 0.4);
+}
+
+@media (max-width: 600px) {
+  .header {
+    padding: 0.75rem 1rem;
+  }
+
+  .logo {
+    font-size: 1.2rem;
+  }
+
+  .user-name {
+    display: none;
+  }
+
+  .auth-buttons {
+    gap: 0.5rem;
+  }
+
+  .btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+  }
 }
 </style>
