@@ -425,7 +425,7 @@ export default {
 }
 
 .upload-hint {
-  color: #999;
+  color: var(--text-muted);
   font-size: 0.95rem;
 }
 
@@ -454,7 +454,7 @@ export default {
   display: block;
   margin-top: 0.5rem;
   font-size: 0.85rem;
-  color: #636e72;
+  color: var(--text-muted);
   font-weight: 500;
 }
 
@@ -650,7 +650,7 @@ export default {
 
 .chat-header {
   font-size: 1.5rem;
-  color: var(--text-color);
+  color: var(--text-main);
   margin-bottom: 1.5rem;
   font-weight: 700;
 }
@@ -664,9 +664,10 @@ export default {
   flex-direction: column;
   gap: 1rem;
   padding: 1rem;
-  background: var(--light-gray, #f8f9fa);
+  background: var(--bg-color);
   border-radius: 12px;
   min-height: 60px;
+  border: 1px solid var(--border-color);
 }
 
 .chat-bubble {
@@ -686,9 +687,11 @@ export default {
 
 .bot-bubble {
   align-self: flex-start;
-  background: white;
-  color: var(--text-color, #2d3436);
+  background: var(--surface-color);
+  color: var(--text-main);
   border-bottom-left-radius: 4px;
+  border-left: 4px solid var(--primary-color);
+  border: 1px solid var(--border-color);
   border-left: 4px solid var(--primary-color);
 }
 
@@ -705,6 +708,7 @@ export default {
   margin: 0;
   line-height: 1.6;
   font-size: 0.95rem;
+  color: inherit;
 }
 
 /* Typing indicator */
@@ -759,7 +763,7 @@ export default {
 }
 
 .chat-input::placeholder {
-  color: #b2bec3;
+  color: var(--text-muted);
 }
 
 .send-btn {
@@ -801,7 +805,7 @@ export default {
 
 .markdown-content :deep(strong) {
   font-weight: 700;
-  color: var(--primary-dark);
+  color: var(--primary-color);
 }
 
 .markdown-content :deep(ul), .markdown-content :deep(ol) {
@@ -817,7 +821,7 @@ export default {
 .markdown-content :deep(h1), .markdown-content :deep(h2), .markdown-content :deep(h3) {
   margin: 1rem 0 0.5rem 0;
   font-weight: 700;
-  color: var(--primary-dark);
+  color: var(--text-main);
 }
 
 @media (max-width: 768px) {

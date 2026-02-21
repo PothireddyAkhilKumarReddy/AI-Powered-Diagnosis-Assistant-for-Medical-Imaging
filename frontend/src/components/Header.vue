@@ -107,7 +107,7 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 1.25rem 2rem;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--surface-color);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-color);
@@ -191,12 +191,22 @@ export default {
   justify-content: center;
   transition: all 0.3s ease;
   box-shadow: var(--shadow-sm);
+  color: var(--text-main);
+}
+
+.theme-toggle svg {
+  transition: transform 0.3s ease;
 }
 
 .theme-toggle:hover {
   border-color: var(--primary-color);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+  color: var(--primary-color);
+}
+
+.theme-toggle:hover svg {
+  transform: rotate(15deg);
 }
 
 .auth-buttons {

@@ -45,6 +45,48 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
   --shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.08);
+
+
+  /* Legacy variable aliases (used by some components with fallbacks) */
+  --card-bg: #FFFFFF;
+  --text-color: #2d3436;
+  --gray: #dfe6e9;
+  --bg-secondary: #f5f7fa;
+}
+
+/* ===== DARK THEME ===== */
+[data-theme='dark'] {
+  /* Brand Colors - slightly brighter for dark bg */
+  --primary-color: #818CF8;
+  --primary-dark: #6366F1;
+  --secondary-color: #A5B4FC;
+  --accent-color: #34D399;
+
+  /* Dark Neutral Palette */
+  --bg-color: #0F172A;
+  --surface-color: #1E293B;
+  --text-main: #F1F5F9;
+  --text-muted: #94A3B8;
+  --border-color: #334155;
+
+  /* Status Colors - brighter for dark bg */
+  --success-color: #34D399;
+  --warning-color: #FBBF24;
+  --danger-color: #F87171;
+
+  /* Shadows - deeper for dark mode */
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+  --shadow-xl: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+
+  /* Legacy variable aliases */
+  --card-bg: #1E293B;
+  --text-color: #F1F5F9;
+  --gray: #334155;
+  --bg-secondary: #0F172A;
+  --light-gray: #1E293B;
+  --dark-gray: #F1F5F9;
 }
 
 /* Reset & Base Styles */
@@ -57,6 +99,7 @@
 html {
   scroll-behavior: smooth;
   font-size: 16px;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 body {
@@ -279,7 +322,7 @@ a:hover {
 }
 
 .text-muted {
-  color: #636e72;
+  color: var(--text-muted);
 }
 
 .mt-1 {
@@ -405,7 +448,7 @@ a:hover {
   border-radius: var(--radius-lg);
   padding: 2.5rem;
   box-shadow: var(--shadow-xl);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--border-color);
   transition: var(--transition);
   position: relative;
   overflow: hidden;

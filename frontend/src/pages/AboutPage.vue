@@ -176,7 +176,7 @@ export default {
 
 .step-card p {
   font-size: 0.9rem;
-  color: #636e72;
+  color: var(--text-muted);
   line-height: 1.5;
 }
 
@@ -198,7 +198,7 @@ export default {
 .contact-note {
   margin-top: 1rem !important;
   font-size: 0.85rem !important;
-  color: #636e72 !important;
+  color: var(--text-muted) !important;
   font-style: italic;
 }
 

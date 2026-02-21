@@ -460,15 +460,15 @@ export default {
   padding: 0.875rem 1rem;
   border-radius: 10px;
   border: none;
-  background: white;
-  color: #1f2937;
+  background: var(--surface-color);
+  color: var(--text-main);
   font-size: 0.95rem;
   font-family: inherit;
   box-sizing: border-box;
 }
 
 .solid-input::placeholder {
-  color: #9ca3af;
+  color: var(--text-muted);
 }
 
 .solid-input:focus {
@@ -576,7 +576,7 @@ export default {
   width: 50px;
   height: 50px;
   border-radius: 10px;
-  background: white;
+  background: var(--surface-color);
   border: none;
   display: flex;
   justify-content: center;
