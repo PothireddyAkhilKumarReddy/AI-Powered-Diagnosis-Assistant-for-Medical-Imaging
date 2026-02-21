@@ -48,6 +48,11 @@ except ImportError:
 # Try to import TensorFlow
 try:
     import tensorflow as tf
+    
+    # Enforce thread limits to prevent OOM
+    tf.config.threading.set_inter_op_parallelism_threads(1)
+    tf.config.threading.set_intra_op_parallelism_threads(1)
+    
     print("OK  TensorFlow loaded")
     TF_AVAILABLE = True
 except Exception as e:
