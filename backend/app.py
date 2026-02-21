@@ -68,7 +68,7 @@ CLASS_DESCRIPTIONS = {
     "COVID-19": "The X-ray shows signs consistent with COVID-19 pneumonia. Please consult a healthcare provider immediately.",
     "Normal": "The X-ray appears normal with no significant findings. However, a medical professional should review for confirmation.",
     "Pneumonia": "The X-ray shows signs consistent with pneumonia. We recommend immediate medical evaluation.",
-    "Tuberculosis": "The X-ray shows signs consistent with Tuberculosis. We recommend immediate medical evaluation."
+    "Tuberculosis": "The X-ray shows signs consistent with Tuberculosis (TB). TB is a serious but treatable infectious disease. Please seek immediate medical attention for proper diagnosis and treatment."
 }
 
 # Global model
