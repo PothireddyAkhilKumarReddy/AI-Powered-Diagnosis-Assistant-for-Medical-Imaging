@@ -1,6 +1,16 @@
 # app.py
+import os
+from dotenv import load_dotenv
+import google.generativeai as genai
+
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+
+# Load environment variables
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 
 # WORKAROUND: Fix for TensorFlow < 2.10 on Windows with newer NumPy
@@ -256,13 +266,41 @@ def predict():
         return jsonify({"success": False, "error": f"An error occurred: {str(e)}"}), 500
 
 
-# Placeholder for future chatbot/conversation features
+# Chatbot feature powered by Google Gemini
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
     user_message = data.get("message", "")
-    # For now, just echo the message. Extend this for real chat features.
-    return jsonify({"response": f"You said: {user_message}. Chat features coming soon!"})
+    
+    if not GEMINI_API_KEY:
+        return jsonify({"response": "Error: Gemini API key is not configured on the server."}), 500
+
+    try:
+        # Define the AI Persona
+        system_instruction = (
+            "You are DiagnoBot, an expert AI medical assistant created by engineers and doctors. "
+            "Your goal is to provide helpful, accurate, and empathetic medical information and advice. "
+            "Always be professional, concise, and clear. "
+            "IMPORTANT: Always remind users that you are an AI and they should consult a real doctor or seek emergency care for serious issues."
+        )
+        
+        # Initialize Gemini Model
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        
+        # Manually inject system instruction into the prompt for maximum compatibility
+        full_prompt = f"{system_instruction}\n\nUser Question:\n{user_message}"
+        
+        # Generate Response
+        response = model.generate_content(full_prompt)
+        return jsonify({"response": response.text})
+    except Exception as e:
+        import traceback
+        print(f"Gemini Error: {e}")
+        traceback.print_exc()
+        import sys
+        sys.stdout.flush()
+        sys.stderr.flush()
+        return jsonify({"response": "I'm sorry, I encountered an internal error while processing your request. Please try again."}), 500
 
 if __name__ == "__main__":
     # Ensure uploads directory exists
