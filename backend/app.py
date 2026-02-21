@@ -10,14 +10,14 @@ import sys
 import json
 import random
 from pathlib import Path
-from dotenv import load_dotenv
+from dotenv import load_dotenv  # type: ignore
 
 # Load environment variables for Gemini API
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 try:
-    import google.generativeai as genai
+    import google.generativeai as genai  # type: ignore
     if GEMINI_API_KEY:
         genai.configure(api_key=GEMINI_API_KEY)
         print("✓ Gemini API configured")
@@ -32,20 +32,20 @@ except Exception as e:
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['TF_USE_LEGACY_KERAS'] = '1'
 
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
-import numpy as np
+from flask import Flask, request, jsonify, send_from_directory  # type: ignore
+from flask_cors import CORS  # type: ignore
+import numpy as np  # type: ignore
 
 # WORKAROUND: Fix for TensorFlow < 2.10 on Windows with newer NumPy
 try:
-    import tensorflow.python.framework.dtypes
-    import tensorflow.python.framework.tensor_util
+    import tensorflow.python.framework.dtypes  # type: ignore
+    import tensorflow.python.framework.tensor_util  # type: ignore
 except ImportError:
     pass
 
 # Try to import TensorFlow
 try:
-    import tensorflow as tf
+    import tensorflow as tf  # type: ignore
     print("✓ TensorFlow loaded")
     TF_AVAILABLE = True
 except Exception as e:
@@ -116,7 +116,7 @@ def mock_predict():
 
 def preprocess_image(image_path):
     """Preprocess image for model inference"""
-    from tensorflow.keras.preprocessing import image
+    from tensorflow.keras.preprocessing import image  # type: ignore
     
     img = image.load_img(image_path, target_size=(224, 224))
     img_array = image.img_to_array(img)
