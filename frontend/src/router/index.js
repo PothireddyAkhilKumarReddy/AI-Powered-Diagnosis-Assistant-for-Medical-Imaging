@@ -4,6 +4,7 @@ import LoginPage from '../pages/LoginPage.vue'
 import SignupPage from '../pages/SignupPage.vue'
 import DashboardPage from '../pages/DashboardPage.vue'
 import PricingPage from '../pages/PricingPage.vue'
+import AboutPage from '../pages/AboutPage.vue'
 
 const routes = [
   {
@@ -34,6 +35,12 @@ const routes = [
     path: '/pricing',
     name: 'Pricing',
     component: PricingPage,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/about',
+    name: 'About',
+    component: AboutPage,
     meta: { requiresAuth: false }
   }
 ]
