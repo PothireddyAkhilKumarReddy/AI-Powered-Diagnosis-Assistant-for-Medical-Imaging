@@ -70,7 +70,7 @@
 
       <div class="chat-response" v-if="chatResponse">
         <div class="response-bubble">
-          <p>{{ chatResponse }}</p>
+          <div class="markdown-content" v-html="chatResponseHtml"></div>
         </div>
       </div>
     </div>
@@ -78,7 +78,8 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { marked } from 'marked'
 
 export default {
   name: 'ChatSection',
@@ -94,6 +95,12 @@ export default {
     const confidenceBreakdown = ref(null)
     const chatMessage = ref('')
     const chatResponse = ref('')
+
+    // Convert Gemini markdown directly into HTML
+    const chatResponseHtml = computed(() => {
+      if (!chatResponse.value) return ''
+      return marked(chatResponse.value)
+    })
 
     // API Configuration
     const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -243,8 +250,8 @@ export default {
       onDragover,
       onDragleave,
       onDrop,
-      handleFileSelect,
-      sendMessage
+      sendMessage,
+      chatResponseHtml
     }
   }
 }
@@ -536,10 +543,35 @@ export default {
   transform: translateX(4px);
 }
 
-.response-bubble p {
-  margin: 0;
+.markdown-content :deep(p) {
+  margin: 0 0 1rem 0;
   line-height: 1.6;
   font-size: 0.95rem;
+}
+
+.markdown-content :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown-content :deep(strong) {
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+
+.markdown-content :deep(ul), .markdown-content :deep(ol) {
+  margin: 0.5rem 0 1rem 1.5rem;
+  padding: 0;
+}
+
+.markdown-content :deep(li) {
+  margin-bottom: 0.4rem;
+  line-height: 1.5;
+}
+
+.markdown-content :deep(h1), .markdown-content :deep(h2), .markdown-content :deep(h3) {
+  margin: 1.2rem 0 0.8rem 0;
+  font-weight: 700;
+  color: var(--primary-dark);
 }
 
 @media (max-width: 768px) {
