@@ -1,26 +1,32 @@
 <template>
-  <section class="features-section">
-    <div class="features-container">
+  <section class="features-section section">
+    <div class="container">
+      <div class="section-header text-center fade-in">
+        <div class="badge badge-success mb-2">Capabilities</div>
+        <h2>Unlock the Power of Medical AI</h2>
+        <p class="text-muted" style="max-width: 600px; margin: 0 auto;">Our advanced algorithms provide unparalleled accuracy, helping you diagnose faster and with greater confidence.</p>
+      </div>
+
       <div class="features-grid">
-        <FeatureCard
-          icon="🌱"
-          title="Revolutionary Product"
-          subtitle="Your Personal AI Health Assistant, 24/7."
-          description="Skip the wait for appointments and stop searching symptoms online. Our AI health assistance chat offers instant, accurate symptom checking, personalized recommendations for medical tests, and detailed treatment plans – all created and validated by our team of experienced doctors and engineers."
+        <FeatureCard class="fade-in" style="animation-delay: 0.1s"
+          icon="⚡"
+          title="Instant Processing"
+          subtitle="Real-time Analysis"
+          description="Skip the wait for appointments. Our AI health assistance offers instant, accurate symptom checking and evaluations within seconds of uploading your scans."
         />
 
-        <FeatureCard
-          icon="💬"
-          title="AI Validated by Doctors"
-          subtitle="Machine Learning Meets Medicine."
-          description="Our chatbot uses LLMs fine-tuned on real medical data, patient-doctor conversations, and medical protocols. Our custom-built AI system understands your symptoms and provides accurate, up-to-date medical advice. Every recommendation, treatment plan, and test is validated by medical professionals."
+        <FeatureCard class="fade-in" style="animation-delay: 0.2s"
+          icon="🩺"
+          title="Doctor Validated"
+          subtitle="Clinical Accuracy"
+          description="Powered by LLMs fine-tuned on diverse medical data. Every recommendation, treatment plan, and anomaly detection is rigorously validated by medical professionals."
         />
 
-        <FeatureCard
-          icon="💎"
-          title="The Value you Get"
-          subtitle="Get an AI-Backed Second Opinion."
-          description="With our health assistant, you save both time and money. Avoid unnecessary doctor visits and high medical bills by getting answers to your health questions immediately. Not sure about a diagnosis or treatment plan? Use our AI health chat to get a second opinion."
+        <FeatureCard class="fade-in" style="animation-delay: 0.3s"
+          icon="🛡️"
+          title="Second Opinion"
+          subtitle="Reliable Insights"
+          description="Save time and mitigate high medical bills. Whether you are a patient seeking clarity or a doctor needing a secondary confirmation, our AI provides clear, backed insights."
         />
       </div>
     </div>
@@ -40,26 +46,26 @@ export default {
 
 <style scoped>
 .features-section {
-  padding: 4rem 2rem;
-  background: #f8f9fa;
+  background-color: var(--bg-color);
+  position: relative;
+  overflow: hidden;
 }
 
-.features-container {
-  max-width: 1200px;
-  margin: 0 auto;
+.section-header {
+  margin-bottom: 4rem;
 }
 
 .features-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 2.5rem;
 }
 
 @media (max-width: 768px) {
-  .features-section {
-    padding: 2rem 1rem;
+  .section-header {
+    margin-bottom: 3rem;
   }
-
+  
   .features-grid {
     gap: 1.5rem;
   }

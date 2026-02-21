@@ -1,9 +1,13 @@
 <template>
-  <div class="feature-card">
-    <div class="feature-icon">{{ icon }}</div>
-    <h3 class="feature-title">{{ title }}</h3>
-    <p class="feature-subtitle">{{ subtitle }}</p>
-    <p class="feature-description">{{ description }}</p>
+  <div class="card feature-card">
+    <div class="feature-icon-wrapper">
+      <span class="feature-icon">{{ icon }}</span>
+    </div>
+    <div class="feature-content">
+      <h3 class="feature-title">{{ title }}</h3>
+      <p class="feature-subtitle">{{ subtitle }}</p>
+      <p class="feature-description">{{ description }}</p>
+    </div>
   </div>
 </template>
 
@@ -33,40 +37,64 @@ export default {
 
 <style scoped>
 .feature-card {
-  background: white;
-  padding: 2rem;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+  padding: 2.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
-.feature-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+.feature-icon-wrapper {
+  width: 56px;
+  height: 56px;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2rem;
+  transition: var(--transition);
+}
+
+.feature-card:hover .feature-icon-wrapper {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  transform: scale(1.05) rotate(-5deg);
 }
 
 .feature-icon {
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
+  font-size: 1.75rem;
+  transition: var(--transition);
+}
+
+.feature-card:hover .feature-icon {
+  filter: brightness(0) invert(1);
+}
+
+.feature-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .feature-title {
-  font-size: 1.3rem;
-  font-weight: bold;
-  margin: 0.5rem 0;
-  color: #333;
+  font-size: 1.25rem;
+  margin-bottom: 0.5rem;
 }
 
 .feature-subtitle {
-  color: #6c5ce7;
-  margin: 0.5rem 0;
+  color: var(--primary-color);
+  font-size: 0.875rem;
   font-weight: 600;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .feature-description {
-  color: #666;
-  font-size: 0.95rem;
+  color: var(--text-muted);
+  font-size: 1rem;
   line-height: 1.6;
-  margin: 1rem 0 0 0;
+  margin: 0;
 }
 </style>
