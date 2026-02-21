@@ -175,7 +175,8 @@ export default {
 .dashboard-container {
   flex: 1;
   padding: 2rem 0;
-  background: linear-gradient(135deg, #f5f7fa 0%, #f0eff5 100%);
+  background: var(--bg-secondary, #f5f7fa);
+  transition: background 0.3s ease;
 }
 
 .welcome-section {
@@ -206,13 +207,13 @@ export default {
 }
 
 .stat-card {
-  background: white;
+  background: var(--card-bg, white);
   border-radius: 12px;
   padding: 2rem;
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
   transition: all 0.3s ease;
   cursor: pointer;
 }
@@ -231,7 +232,7 @@ export default {
 .stat-content h3 {
   margin: 0;
   font-size: 2.5rem;
-  color: #6c5ce7;
+  color: var(--primary-color, #6c5ce7);
 }
 
 .stat-content p {
@@ -246,7 +247,7 @@ export default {
 
 .quick-actions h2 {
   margin-bottom: 1.5rem;
-  color: #2d3436;
+  color: var(--text-color, #2d3436);
 }
 
 .action-buttons {
@@ -256,8 +257,8 @@ export default {
 }
 
 .action-btn {
-  background: white;
-  border: 2px solid #dfe6e9;
+  background: var(--card-bg, white);
+  border: 2px solid var(--gray, #dfe6e9);
   border-radius: 12px;
   padding: 1.5rem;
   cursor: pointer;
@@ -268,11 +269,11 @@ export default {
   gap: 0.75rem;
   font-size: 1rem;
   font-weight: 500;
-  color: #2d3436;
+  color: var(--text-color, #2d3436);
 }
 
 .action-btn:hover {
-  border-color: #6c5ce7;
+  border-color: var(--primary-color, #6c5ce7);
   background: linear-gradient(135deg, rgba(108, 92, 231, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
   transform: translateY(-4px);
 }
@@ -287,7 +288,7 @@ export default {
 
 .recent-section h2 {
   margin-bottom: 1.5rem;
-  color: #2d3436;
+  color: var(--text-color, #2d3436);
 }
 
 .analysis-list {
@@ -297,19 +298,19 @@ export default {
 }
 
 .analysis-item {
-  background: white;
+  background: var(--card-bg, white);
   border-radius: 12px;
   padding: 1.5rem;
   display: grid;
   grid-template-columns: 120px auto 1fr;
   align-items: center;
   gap: 1rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
   transition: all 0.3s ease;
 }
 
 .analysis-item:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-md);
 }
 
 .item-date {
@@ -324,7 +325,7 @@ export default {
 }
 
 .item-description {
-  color: #2d3436;
+  color: var(--text-color, #2d3436);
   font-size: 0.95rem;
 }
 
@@ -335,6 +336,21 @@ export default {
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
+}
+
+.badge-normal {
+  background: rgba(39, 174, 96, 0.1);
+  color: #27ae60;
+}
+
+.badge-covid-19 {
+  background: rgba(214, 48, 49, 0.1);
+  color: #d63031;
+}
+
+.badge-pneumonia {
+  background: rgba(243, 156, 18, 0.1);
+  color: #f39c12;
 }
 
 .badge-success {
@@ -353,11 +369,11 @@ export default {
 }
 
 .empty-state {
-  background: white;
+  background: var(--card-bg, white);
   border-radius: 12px;
   padding: 3rem;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
   color: #636e72;
 }
 
