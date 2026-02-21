@@ -492,6 +492,222 @@ def chat():
             "error": str(e)
         }), 500
 
+# Grad-CAM Heatmap Endpoint (Feature 2)
+@app.route('/api/gradcam', methods=['POST'])
+def gradcam():
+    """Generate Grad-CAM heatmap for the uploaded image"""
+    if "image" not in request.files:
+        return jsonify({"success": False, "error": "No image provided"}), 400
+    
+    file = request.files["image"]
+    safe_filename = sanitize_filename(file.filename)
+    img_path = os.path.join(UPLOADS_DIR, safe_filename)
+    file.save(img_path)
+    
+    try:
+        loaded_model = load_model()
+        if not TF_AVAILABLE or loaded_model is None:
+            return jsonify({"success": False, "error": "Model not available for heatmap generation"}), 503
+        
+        import base64
+        from io import BytesIO
+        
+        # Preprocess image
+        processed_img = preprocess_image(img_path)
+        
+        # Find the last conv layer in DenseNet121
+        last_conv_layer = None
+        for layer in reversed(loaded_model.layers):
+            if hasattr(layer, 'output') and len(layer.output.shape) == 4:
+                last_conv_layer = layer
+                break
+        
+        if last_conv_layer is None:
+            return jsonify({"success": False, "error": "Could not find convolutional layer"}), 500
+        
+        # Compute Grad-CAM
+        grad_model = tf.keras.Model(
+            inputs=loaded_model.input,
+            outputs=[last_conv_layer.output, loaded_model.output]
+        )
+        
+        with tf.GradientTape() as tape:
+            conv_outputs, predictions = grad_model(processed_img)
+            predicted_class = tf.argmax(predictions[0])
+            loss = predictions[:, predicted_class]
+        
+        grads = tape.gradient(loss, conv_outputs)
+        pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+        
+        conv_outputs = conv_outputs[0]
+        heatmap = conv_outputs @ pooled_grads[..., tf.newaxis]
+        heatmap = tf.squeeze(heatmap)
+        heatmap = tf.maximum(heatmap, 0) / (tf.math.reduce_max(heatmap) + 1e-8)
+        heatmap = heatmap.numpy()
+        
+        # Resize heatmap to image size and create overlay
+        from PIL import Image as PILImage
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import matplotlib.cm as cm
+        
+        original_img = PILImage.open(img_path).resize((224, 224))
+        
+        # Apply colormap to heatmap
+        heatmap_resized = np.uint8(255 * heatmap)
+        jet = cm.get_cmap('jet')
+        jet_colors = jet(np.arange(256))[:, :3]
+        jet_heatmap = jet_colors[heatmap_resized]
+        
+        # Resize heatmap to match image
+        jet_heatmap_img = PILImage.fromarray(np.uint8(jet_heatmap * 255)).resize((224, 224))
+        
+        # Superimpose
+        superimposed = PILImage.blend(original_img.convert('RGB'), jet_heatmap_img.convert('RGB'), alpha=0.4)
+        
+        # Convert to base64
+        buffer = BytesIO()
+        superimposed.save(buffer, format='PNG')
+        buffer.seek(0)
+        heatmap_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        return jsonify({
+            "success": True,
+            "heatmap": f"data:image/png;base64,{heatmap_base64}",
+            "predicted_class": CLASS_LABELS[int(predicted_class)]
+        })
+    except Exception as e:
+        print(f"Grad-CAM error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        if os.path.exists(img_path):
+            try:
+                os.remove(img_path)
+            except:
+                pass
+
+
+# PDF Report Endpoint (Feature 3)
+@app.route('/api/report', methods=['POST'])
+def generate_report():
+    """Generate a PDF diagnosis report"""
+    try:
+        data = request.get_json()
+        prediction = data.get('prediction', {})
+        
+        if not prediction:
+            return jsonify({"success": False, "error": "No prediction data"}), 400
+        
+        from io import BytesIO
+        from datetime import datetime
+        
+        try:
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.units import inch
+            from reportlab.lib import colors
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        except ImportError:
+            return jsonify({"success": False, "error": "reportlab not installed. Run: pip install reportlab"}), 500
+        
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch)
+        styles = getSampleStyleSheet()
+        story = []
+        
+        # Title
+        title_style = ParagraphStyle('title', parent=styles['Title'], fontSize=24, textColor=colors.HexColor('#6c5ce7'))
+        story.append(Paragraph("DiagnoBot AI Diagnosis Report", title_style))
+        story.append(Spacer(1, 20))
+        
+        # Timestamp
+        story.append(Paragraph(f"<b>Date:</b> {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", styles['Normal']))
+        story.append(Spacer(1, 20))
+        
+        # Prediction Results
+        header_style = ParagraphStyle('header', parent=styles['Heading2'], textColor=colors.HexColor('#764ba2'))
+        story.append(Paragraph("Diagnosis Result", header_style))
+        story.append(Spacer(1, 10))
+        
+        result_data = [
+            ['Field', 'Value'],
+            ['Prediction', prediction.get('class', 'N/A')],
+            ['Confidence', f"{(prediction.get('confidence', 0) * 100):.1f}%"],
+            ['Description', prediction.get('description', 'N/A')]
+        ]
+        
+        result_table = Table(result_data, colWidths=[2*inch, 4*inch])
+        result_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c5ce7')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f8f9fa')),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#dfe6e9')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        story.append(result_table)
+        story.append(Spacer(1, 20))
+        
+        # Confidence Breakdown
+        all_preds = prediction.get('all_predictions', {})
+        if all_preds:
+            story.append(Paragraph("Confidence Breakdown", header_style))
+            story.append(Spacer(1, 10))
+            
+            breakdown_data = [['Class', 'Confidence']]
+            for cls, conf in all_preds.items():
+                breakdown_data.append([cls, f"{(conf * 100):.1f}%"])
+            
+            breakdown_table = Table(breakdown_data, colWidths=[3*inch, 3*inch])
+            breakdown_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#764ba2')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 11),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#dfe6e9')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ]))
+            story.append(breakdown_table)
+            story.append(Spacer(1, 30))
+        
+        # Disclaimer
+        disclaimer_style = ParagraphStyle('disclaimer', parent=styles['Normal'], fontSize=9, textColor=colors.gray)
+        story.append(Paragraph(
+            "<b>Disclaimer:</b> This report is generated by an AI system for informational purposes only. "
+            "It should NOT be used as a substitute for professional medical advice, diagnosis, or treatment. "
+            "Always seek the advice of a physician or other qualified health provider with any questions "
+            "you may have regarding a medical condition.", disclaimer_style
+        ))
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("Generated by DiagnoBot AI | diagnobot.ai", disclaimer_style))
+        
+        doc.build(story)
+        buffer.seek(0)
+        
+        from flask import send_file
+        return send_file(
+            buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'DiagnoBot_Report_{datetime.now().strftime("%Y%m%d_%H%M")}.pdf'
+        )
+    except Exception as e:
+        print(f"Report generation error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
 
 if __name__ == "__main__":
     # Ensure uploads directory exists
@@ -501,7 +717,10 @@ if __name__ == "__main__":
     print("Frontend will be available at: http://localhost:5003")
     print("API endpoints:")
     print("   - POST /api/predict - Upload medical images for diagnosis")
+    print("   - POST /api/gradcam - Generate Grad-CAM heatmap")
+    print("   - POST /api/report - Download PDF report")
     print("   - POST /api/chat - Chat with the AI")
     print("   - POST /api/auth/signup - Register new user")
     print("   - POST /api/auth/login - Login user")
     app.run(debug=True, host='0.0.0.0', port=5003)
+
