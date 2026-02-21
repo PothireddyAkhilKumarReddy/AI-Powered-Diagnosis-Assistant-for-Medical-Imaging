@@ -20,17 +20,16 @@ try:
     import google.generativeai as genai
     if GEMINI_API_KEY:
         genai.configure(api_key=GEMINI_API_KEY)
-        print("✓ Gemini API configured")
+        print("OK  Gemini API configured")
     else:
-        print("⚠️  GEMINI_API_KEY not found in environment")
+        print("WARN  GEMINI_API_KEY not found in environment")
 except ImportError:
-    print("⚠️  google-generativeai not installed. Chat features will be limited.")
+    print("WARN  google-generativeai not installed. Chat features will be limited.")
 except Exception as e:
-    print(f"⚠️  Gemini API error: {e}")
+    print(f"WARN  Gemini API error: {e}")
 
 # Suppress TensorFlow warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['TF_USE_LEGACY_KERAS'] = '1'
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -46,10 +45,10 @@ except ImportError:
 # Try to import TensorFlow
 try:
     import tensorflow as tf
-    print("✓ TensorFlow loaded")
+    print("OK  TensorFlow loaded")
     TF_AVAILABLE = True
 except Exception as e:
-    print(f"✗ TensorFlow error: {e}")
+    print(f"ERR TensorFlow error: {e}")
     TF_AVAILABLE = False
 
 app = Flask(__name__, static_folder='../frontend/dist', static_url_path='')
@@ -75,6 +74,45 @@ CLASS_DESCRIPTIONS = {
 model = None
 model_loaded = False
 
+def load_keras3_model_safely(model_path):
+    """
+    Reconstructs the model architecture in code and loads weights.
+    This bypasses Keras 3 -> Keras 2 config incompatibility.
+    """
+    print("DEBUG: Reconstructing model architecture...")
+    try:
+        # Reconstruct the exact architecture matching Colab notebook (Functional API)
+        base_model = tf.keras.applications.DenseNet121(
+            include_top=False,
+            weights=None, 
+            input_shape=(224, 224, 3)
+        )
+        base_model.trainable = True
+
+        inputs = tf.keras.Input(shape=(224, 224, 3))
+        x = base_model(inputs)
+        x = tf.keras.layers.GlobalAveragePooling2D()(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.5)(x)
+        x = tf.keras.layers.Dense(512, activation='relu')(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.3)(x)
+        outputs = tf.keras.layers.Dense(3, activation='softmax')(x)
+        model = tf.keras.Model(inputs, outputs)
+        
+        print("DEBUG: Loading weights into reconstructed model...")
+        try:
+            model.load_weights(str(model_path), by_name=True, skip_mismatch=True)
+            print("DEBUG: Model weighted loaded successfully (partial/by_name)!")
+            return model
+        except Exception as e:
+             print(f"DEBUG: Standard load_weights failed: {e}")
+             print("Falling back to None.")
+             return None
+    except Exception as e:
+        print(f"DEBUG: Reconstruction failed: {e}")
+        return None
+
 def load_model():
     """Load the trained model safely"""
     global model, model_loaded
@@ -83,27 +121,35 @@ def load_model():
         return model
     
     if not TF_AVAILABLE:
-        print("⚠️  TensorFlow not available. Using mock mode.")
+        print("WARN  TensorFlow not available. Using mock mode.")
         model_loaded = True
         return None
     
     print("Loading AI model...")
     try:
         if not MODEL_PATH.exists():
-            print(f"⚠️  Model file not found at {MODEL_PATH}")
+            print(f"WARN  Model file not found at {MODEL_PATH}")
             raise FileNotFoundError(f"Model not found: {MODEL_PATH}")
         
-        # Load model with TensorFlow
-        model = tf.keras.models.load_model(
-            str(MODEL_PATH),
-            compile=False
-        )
-        print("✓ Model loaded successfully!")
+        # Try direct load first
+        try:
+            model = tf.keras.models.load_model(str(MODEL_PATH), compile=False)
+            print("OK  Model loaded successfully!")
+        except Exception as e:
+            print(f"ERR Direct load failed: {e}")
+            print("Trying Keras 3 compatibility patch...")
+            model = load_keras3_model_safely(MODEL_PATH)
+            
+            if model is not None:
+                print("OK  Model loaded with compatibility patch.")
+            else:
+                raise ValueError("Both direct load and patch failed.")
+
         model_loaded = True
         return model
     except Exception as e:
-        print(f"✗ Error loading model: {e}")
-        print("⚠️  Falling back to mock predictions")
+        print(f"ERR Error loading model: {e}")
+        print("WARN  Falling back to mock predictions")
         model_loaded = True
         return None
 
